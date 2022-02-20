@@ -28,6 +28,10 @@
 #include "Unit.h"
 #include "Util.h"
 
+#ifndef NPCBOT
+#include "botmgr.h"
+#endif
+
 Vehicle::Vehicle(Unit* unit, VehicleEntry const* vehInfo, uint32 creatureEntry) :
     _me(unit), _vehicleInfo(vehInfo), _usableSeatNum(0), _creatureEntry(creatureEntry), _status(STATUS_NONE)
 {
@@ -356,6 +360,15 @@ bool Vehicle::AddPassenger(Unit* unit, int8 seatId)
         {
             if (_me->GetTypeId() == TYPEID_PLAYER)
                 _me->RemoveFlag(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_PLAYER_VEHICLE);
+#ifndef NPCBOT
+            else if (_me->GetTypeId() == TYPEID_UNIT && _me->ToCreature()->IsNPCBot())
+            {
+				if (unit->GetTypeId() == TYPEID_PLAYER)
+                    unit->RemoveFlag(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_PLAYER_VEHICLE);
+				else
+                    unit->RemoveFlag(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_SPELLCLICK);
+            }
+#endif
             else
                 _me->RemoveFlag(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_SPELLCLICK);
         }
@@ -378,7 +391,12 @@ bool Vehicle::AddPassenger(Unit* unit, int8 seatId)
     unit->m_movementInfo.transport.seat = seat->first;
     unit->m_movementInfo.transport.guid = _me->GetGUID();
 
-    // xinef: removed seat->first == 0 check...
+#ifndef NPCBOT
+	if (_me->GetTypeId() == TYPEID_UNIT && _me->ToCreature()->GetBotAI())
+		BotMgr::OnBotEnterVehicle(_me->ToCreature(), this);
+#endif
+
+    // xinef: removed retarded seat->first == 0 check...
     if (_me->GetTypeId() == TYPEID_UNIT
             && unit->GetTypeId() == TYPEID_PLAYER
             && seat->second.SeatInfo->m_flags & VEHICLE_SEAT_FLAG_CAN_CONTROL)
@@ -387,6 +405,11 @@ bool Vehicle::AddPassenger(Unit* unit, int8 seatId)
         {
             if (!_me->SetCharmedBy(unit, CHARM_TYPE_VEHICLE))
                 ABORT();
+
+#ifndef NPCBOT
+			if (unit->ToPlayer()->HaveBot())
+				BotMgr::OnBotOwnerEnterVehicle(unit->ToPlayer(), this);
+#endif
         }
         catch (...)
         {
@@ -466,10 +489,26 @@ void Vehicle::RemovePassenger(Unit* unit)
     if (seat->second.SeatInfo->m_flags & VEHICLE_SEAT_FLAG_PASSENGER_NOT_SELECTABLE && !seat->second.Passenger.IsUnselectable)
         unit->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
 
+#ifndef NPCBOT
+	if (unit->GetTypeId() == TYPEID_UNIT && unit->ToCreature()->GetBotAI())
+		BotMgr::OnBotExitVehicle(unit->ToCreature(), this);
+#endif
+
     seat->second.Passenger.Reset();
 
+#ifndef NPCBOT
+	if (_me->GetTypeId() == TYPEID_UNIT && unit->GetTypeId() == TYPEID_PLAYER && seat->second.SeatInfo->m_flags & VEHICLE_SEAT_FLAG_CAN_CONTROL)
+	{
+		//npcbot
+		if (unit->ToPlayer()->HaveBot())
+			BotMgr::OnBotOwnerExitVehicle(unit->ToPlayer(), this);
+		//end npcbot
+		_me->RemoveCharmedBy(unit);
+    }
+#else
     if (_me->GetTypeId() == TYPEID_UNIT && unit->GetTypeId() == TYPEID_PLAYER && seat->second.SeatInfo->m_flags & VEHICLE_SEAT_FLAG_CAN_CONTROL)
         _me->RemoveCharmedBy(unit);
+#endif
 
     if (_me->IsInWorld())
     {

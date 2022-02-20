@@ -566,7 +566,12 @@ void Aura::_UnapplyForTarget(Unit* target, Unit* caster, AuraApplication* auraAp
             // note: item based cooldowns and cooldown spell mods with charges ignored (unknown existed cases)
             caster->ToPlayer()->SendCooldownEvent(GetSpellInfo());
         }
-    }
+	}
+
+#ifndef NPCBOT
+	if (caster && m_spellInfo->IsCooldownStartedOnEvent() && caster->GetTypeId() == TYPEID_UNIT && caster->ToCreature()->IsNPCBot())
+		caster->ToCreature()->ReleaseBotSpellCooldown(m_spellInfo->Id);
+#endif
 }
 
 // removes aura from all targets

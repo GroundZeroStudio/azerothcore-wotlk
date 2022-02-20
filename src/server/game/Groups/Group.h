@@ -349,5 +349,10 @@ protected:
     // Xinef: change difficulty prevention
     uint32 _difficultyChangePreventionTime;
     DifficultyPreventionChangeType _difficultyChangePreventionType;
+
+#ifndef NPCBOT
+public:
+    ObjectGuid* GetTargetIcons() { return m_targetIcons; }
+#endif
 };
 #endif

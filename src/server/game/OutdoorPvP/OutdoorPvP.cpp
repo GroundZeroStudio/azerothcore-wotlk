@@ -324,6 +324,23 @@ bool OPvPCapturePoint::Update(uint32 diff)
     if (!fact_diff)
         return false;
 
+#ifndef NPCBOT
+	uint32 botsCount[2];
+
+	for (uint8 team = 0; team != 2; ++team)
+	{
+		botsCount[team] = 0;
+
+		for (GuidSet::iterator itr = m_activePlayers[team].begin(); itr != m_activePlayers[team].end(); ++itr)
+		{
+			if (Player* player = ObjectAccessor::FindPlayer(*itr))
+				botsCount[team] += player->GetNpcBotsCount();
+		}
+	}
+
+	fact_diff += 0.5f * ((float)botsCount[0] - (float)botsCount[1]) * diff / OUTDOORPVP_OBJECTIVE_UPDATE_INTERVAL;
+#endif
+
     TeamId ChallengerId = TEAM_NEUTRAL;
     float maxDiff = m_maxSpeed * diff;
 

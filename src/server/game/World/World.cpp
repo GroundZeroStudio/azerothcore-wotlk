@@ -100,6 +100,10 @@ namespace
     TaskScheduler playersSaveScheduler;
 }
 
+#ifndef NPCBOT
+#include "botmgr.h"
+#endif
+
 std::atomic_long World::m_stopEvent = false;
 uint8 World::m_ExitCode = SHUTDOWN_EXIT_CODE;
 uint32 World::m_worldLoopCounter = 0;
@@ -449,7 +453,7 @@ void World::LoadConfigSettings(bool reload)
         SetPlayerAmountLimit(sConfigMgr->GetOption<int32>("PlayerLimit", 1000));
     }
 
-    Motd::SetMotd(sConfigMgr->GetOption<std::string>("Motd", "Welcome to an AzerothCore server"));
+    //Motd::SetMotd(sConfigMgr->GetOption<std::string>("Motd", "Welcome to an AzerothCore server"));
 
     ///- Read ticket system setting from the config file
     m_bool_configs[CONFIG_ALLOW_TICKETS] = sConfigMgr->GetOption<bool>("AllowTickets", true);
@@ -2112,11 +2116,19 @@ void World::SetInitialWorldSettings()
         }
     }
 
+#ifndef NPCBOT
+	BotMgr::Initialize();
+#endif
+
     uint32 startupDuration = GetMSTimeDiffToNow(startupBegin);
 
     LOG_INFO("server.loading", " ");
     LOG_INFO("server.loading", "WORLD: World initialized in {} minutes {} seconds", (startupDuration / 60000), ((startupDuration % 60000) / 1000)); // outError for red color in console
     LOG_INFO("server.loading", " ");
+    LOG_INFO("server.loading", "     完全原汁原味仿官方设置,没有花里胡哨,没有变态装备,变态属性和各种乱七八糟的修仙设定\n");
+    LOG_INFO("server.loading", "     真正的让你感受最初的那份魔兽味道,适合养老党,休闲党,任务剧情党\n");
+    LOG_INFO("server.loading", "     唯一更新QQ群号:924396021\n");
+    LOG_INFO("server.loading", "     AI魔兽免费单机版使用最新AZ核心+新npcbot\n");
 
     METRIC_EVENT("events", "World initialized", "World initialized in " + std::to_string(startupDuration / 60000) + " minutes " + std::to_string((startupDuration % 60000) / 1000) + " seconds");
 

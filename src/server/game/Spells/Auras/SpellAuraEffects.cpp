@@ -6852,6 +6852,44 @@ void AuraEffect::HandleProcTriggerSpellAuraProc(AuraApplication* aurApp, ProcEve
     if (SpellInfo const* triggeredSpellInfo = sSpellMgr->GetSpellInfo(triggerSpellId))
     {
         LOG_DEBUG("spells.aura", "AuraEffect::HandleProcTriggerSpellAuraProc: Triggering spell {} from aura {} proc", triggeredSpellInfo->Id, GetId());
+
+#ifndef NPCBOT
+        Aura const* triggeredByAura = aurApp->GetBase();
+        int32 basepoints0 = 0;
+        switch (triggerSpellId)
+        {
+            // Quest - Self Healing from resurrect (invisible in log)
+        case 25155:
+        {
+            switch (GetId())
+            {
+                //Vampiric Aura
+            case 20810:
+            {
+                DamageInfo const* dinfo = eventInfo.GetDamageInfo();
+                uint32 damage = dinfo->GetDamage();
+                if (!damage)
+                    return;
+
+                // 100% / 25%
+                if (triggerTarget->GetGUID() == triggeredByAura->GetCasterGUID())
+                    basepoints0 = int32(damage);
+                else
+                    basepoints0 = int32(damage / 4);
+
+                triggerCaster->CastSpell(triggerTarget, triggerSpellId, false);
+                return;
+            }
+            default:
+                break;
+            }
+            break;
+        }
+        default:
+            break;
+        }
+#endif
+
         triggerCaster->CastSpell(triggerTarget, triggeredSpellInfo, true, nullptr, this);
     }
     else

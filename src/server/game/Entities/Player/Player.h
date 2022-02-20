@@ -61,6 +61,10 @@ class PlayerSocial;
 class SpellCastTargets;
 class UpdateMask;
 
+#ifndef NPCBOT
+class BotMgr;
+#endif
+
 typedef std::deque<Mail*> PlayerMails;
 typedef void(*bgZoneRef)(Battleground*, WorldPacket&);
 
@@ -2945,6 +2949,22 @@ private:
     bool _wasOutdoor;
 
     PlayerSettingMap m_charSettingsMap;
+
+#ifndef NPCBOT
+public:
+    bool IsResurrectRequested() const { return false; }
+    bool IsUseEquipedWeapon(bool bCheck) const { return false; }
+
+    void SetBotMgr(BotMgr* mgr) { ASSERT(!_botMgr); _botMgr = mgr; }
+    BotMgr* GetBotMgr() const { return _botMgr; }
+    bool HaveBot() const;
+    uint8 GetNpcBotsCount() const;
+    void RemoveAllBots(uint8 removetype = 0);
+    void UpdatePhaseForBots();
+
+private:
+    BotMgr* _botMgr;
+#endif
 };
 
 void AddItemsSetItem(Player* player, Item* item);

@@ -36,6 +36,10 @@ class Quest;
 class Player;
 class WorldSession;
 class CreatureGroup;
+#ifndef NPCBOT
+class bot_ai;
+class bot_pet_ai;
+#endif
 
 // max different by z coordinate for creature aggro reaction
 #define CREATURE_Z_ATTACK_RANGE 3
@@ -462,6 +466,86 @@ private:
     bool _isMissingSwimmingFlagOutOfCombat;
 
     uint32 m_assistanceTimer;
+
+    #ifndef NPCBOT
+     public:
+    bool LoadBotCreatureFromDB(ObjectGuid::LowType spawnId, Map * map, bool addToMap = true);
+    Player * GetBotOwner() const;
+    Unit * GetBotsPet() const;
+    bool IsNPCBot() const;
+    bool IsNPCBotPet() const;
+    bool IsNPCBotOrPet() const;
+    bool IsFreeBot() const;
+    uint8 GetBotClass() const;
+    uint32 GetBotRoles() const;
+    bot_ai * GetBotAI() const { return bot_AI; }
+     bot_pet_ai * GetBotPetAI() const { return bot_pet_AI; }
+     void SetBotAI(bot_ai * ai) { bot_AI = ai; }
+     void SetBotPetAI(bot_pet_ai * ai) { bot_pet_AI = ai; }
+     void ApplyBotDamageMultiplierMelee(uint32 & damage, CalcDamageInfo & damageinfo) const;
+    void ApplyBotDamageMultiplierMelee(int32 & damage, SpellNonMeleeDamage & damageinfo, SpellInfo const* spellInfo, WeaponAttackType attackType, bool crit) const;
+    void ApplyBotDamageMultiplierSpell(int32 & damage, SpellNonMeleeDamage & damageinfo, SpellInfo const* spellInfo, WeaponAttackType attackType, bool crit) const;
+    void ApplyBotDamageMultiplierHeal(Unit const* victim, float& heal, SpellInfo const* spellInfo, DamageEffectType damagetype, uint32 stack) const;
+    void ApplyBotCritMultiplierAll(Unit const* victim, float& crit_chance, SpellInfo const* spellInfo, SpellSchoolMask schoolMask, WeaponAttackType attackType) const;
+    void ApplyCreatureSpellCostMods(SpellInfo const* spellInfo, int32 & cost) const;
+    void ApplyCreatureSpellCastTimeMods(SpellInfo const* spellInfo, int32 & casttime) const;
+    void ApplyCreatureSpellRadiusMods(SpellInfo const* spellInfo, float& radius) const;
+    void ApplyCreatureSpellRangeMods(SpellInfo const* spellInfo, float& maxrange) const;
+    void ApplyCreatureSpellMaxTargetsMods(SpellInfo const* spellInfo, uint32 & targets) const;
+    void ApplyCreatureSpellChanceOfSuccessMods(SpellInfo const* spellInfo, float& chance) const;
+    void ApplyCreatureEffectMods(SpellInfo const* spellInfo, uint8 effIndex, float& value) const;
+    void OnBotSummon(Creature * summon);
+    void OnBotDespawn(Creature * summon);
+    void BotStopMovement();
+
+    bool CanParry() const;
+    bool CanDodge() const;
+    bool CanBlock() const;
+    bool CanCrit() const;
+    bool CanMiss() const;
+
+    float GetCreatureParryChance() const;
+    float GetCreatureDodgeChance() const;
+    float GetCreatureBlockChance() const;
+    float GetCreatureCritChance() const;
+    float GetCreatureMissChance() const;
+    float GetCreatureArmorPenetrationCoef() const;
+    uint32 GetCreatureExpertise() const;
+    uint32 GetCreatureSpellPenetration() const;
+    uint32 GetCreatureSpellPower() const;
+    uint32 GetCreatureDefense() const;
+    int32 GetCreatureResistanceBonus(SpellSchoolMask mask) const;
+    uint8 GetCreatureComboPoints() const;
+    float GetCreatureAmmoDPS() const;
+
+    bool IsTempBot() const;
+
+    MeleeHitOutcome BotRollMeleeOutcomeAgainst(Unit const* victim, WeaponAttackType attType) const;
+
+    void CastCreatureItemCombatSpell(Unit * target, WeaponAttackType attType, uint32 procVictim, uint32 procEx);
+
+        //bool HasSpellCooldown(uint32 spellId) const;
+    void AddBotSpellCooldown(uint32 spellId, uint32 cooldown);
+    void ReleaseBotSpellCooldown(uint32 spellId);
+
+    void SpendBotRunes(SpellInfo const* spellInfo, bool didHit);
+
+    Item * GetBotEquips(uint8 slot) const;
+    Item * GetBotEquipsByGuid(ObjectGuid itemGuid) const;
+    float GetBotAverageItemLevel() const;
+
+    static bool IsBotCustomSpell(uint32 spellId);
+
+    void SetPowerType(Powers pow) { SetByteValue(UNIT_FIELD_BYTES_0, 3, pow); }
+     float CalculateSpellpowerCoefficientLevelPenalty(const SpellInfo * pSpellInfo) { return 1.0f; }
+
+    private:
+    //bot system
+    bot_ai * bot_AI;
+    bot_pet_ai * bot_pet_AI;
+    //end bot system
+
+    #endif
 
 };
 

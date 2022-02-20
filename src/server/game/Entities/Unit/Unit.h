@@ -2509,6 +2509,14 @@ private:
     uint32 _oldFactionId;           ///< faction before charm
 
     [[nodiscard]] float processDummyAuras(float TakenTotalMod) const;
+    #ifndef NPCBOT
+    public:
+    bool IsRooted() const { return false; }
+    void SetControlledByPlayer(bool set) { m_ControlledByPlayer = set; }
+    bool HasReactive(ReactiveType reactive) const { return m_reactiveTimer[reactive] > 0; }
+    void ClearReactive(ReactiveType reactive);
+    bool IsNPCBot();
+    #endif
 };
 
 namespace Acore

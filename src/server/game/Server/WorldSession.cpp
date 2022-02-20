@@ -52,6 +52,10 @@
 #include "WorldSocket.h"
 #include <zlib.h>
 
+#ifndef NPCBOT
+#include "botmgr.h"
+#endif
+
 namespace
 {
     std::string const DefaultPlayerName = "<none>";
@@ -206,9 +210,14 @@ ObjectGuid::LowType WorldSession::GetGuidLow() const
 /// Send a packet to the client
 void WorldSession::SendPacket(WorldPacket const* packet)
 {
+#ifndef NPCBOT
+    if (this && GetPlayer() && !GetPlayer()->GetGUID().IsPlayer())
+        return;
+#endif
+
     if (packet->GetOpcode() == NULL_OPCODE)
     {
-        LOG_ERROR("network.opcode", "{} send NULL_OPCODE", GetPlayerInfo());
+        //LOG_ERROR("network.opcode", "{} send NULL_OPCODE", GetPlayerInfo());
         return;
     }
 
@@ -545,6 +554,10 @@ void WorldSession::LogoutPlayer(bool save)
 
     m_playerLogout = true;
     m_playerSave = save;
+
+#ifndef NPCBOT
+	_player->RemoveAllBots();
+#endif
 
     if (_player)
     {
@@ -1581,6 +1594,17 @@ uint32 WorldSession::DosProtection::GetMaxPacketCounterAllowed(uint16 opcode) co
                 maxPacketCounterAllowed = PLAYER_SLOTS_COUNT;
                 break;
             }
+
+#ifndef NPCBOT
+		case CMSG_GET_MIRRORIMAGE_DATA:
+		    {
+			    if (BotMgr::GetBotInfoPacketsLimit() > -1)
+				    maxPacketCounterAllowed = BotMgr::GetBotInfoPacketsLimit();
+			    else
+				    maxPacketCounterAllowed = 100;
+			    break;
+		    }
+#endif
 
         default:
             {

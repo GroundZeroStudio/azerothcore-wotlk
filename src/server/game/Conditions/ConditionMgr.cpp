@@ -29,6 +29,10 @@
 #include "SpellAuras.h"
 #include "SpellMgr.h"
 
+#ifndef NPCBOT
+#include "bot_ai.h"
+#endif
+
 // Checks if object meets the condition
 // Can have CONDITION_SOURCE_TYPE_NONE && !mReferenceId if called from a special event (ie: eventAI)
 bool Condition::Meets(ConditionSourceInfo& sourceInfo)
@@ -61,6 +65,11 @@ bool Condition::Meets(ConditionSourceInfo& sourceInfo)
     }
     case CONDITION_ITEM:
     {
+#ifndef NPCBOT
+			    if (object->GetTypeId() == TYPEID_UNIT && object->ToCreature()->IsNPCBot())
+				    condMeets = true;
+                else
+#endif
         if (Player* player = object->ToPlayer())
         {
             // don't allow 0 items (it's checked during table load)
@@ -72,6 +81,11 @@ bool Condition::Meets(ConditionSourceInfo& sourceInfo)
     }
     case CONDITION_ITEM_EQUIPPED:
     {
+#ifndef NPCBOT
+			    if (object->GetTypeId() == TYPEID_UNIT && object->ToCreature()->IsNPCBot())
+				    condMeets = true; //for now
+			    else
+#endif
         if (Player* player = object->ToPlayer())
             condMeets = player->HasItemOrGemWithIdEquipped(ConditionValue1, 1);
         break;
@@ -81,6 +95,15 @@ bool Condition::Meets(ConditionSourceInfo& sourceInfo)
         break;
     case CONDITION_REPUTATION_RANK:
     {
+#ifndef NPCBOT
+			    if (object->GetTypeId() == TYPEID_UNIT && object->ToCreature()->IsNPCBot() &&
+				    object->ToCreature()->GetBotAI() && !object->ToCreature()->IsFreeBot())
+			    {
+				    if (FactionEntry const* faction = sFactionStore.LookupEntry(ConditionValue1))
+					    condMeets = (ConditionValue2 & (1 << object->ToCreature()->GetBotOwner()->GetReputationMgr().GetRank(faction)));
+			    }
+			    else
+#endif
         if (Player* player = object->ToPlayer())
         {
             if (FactionEntry const* faction = sFactionStore.LookupEntry(ConditionValue1))
@@ -90,12 +113,23 @@ bool Condition::Meets(ConditionSourceInfo& sourceInfo)
     }
     case CONDITION_ACHIEVEMENT:
     {
+#ifndef NPCBOT
+			    if (object->GetTypeId() == TYPEID_UNIT && object->ToCreature()->IsNPCBot())
+				    condMeets = true;
+			    else
+#endif
         if (Player* player = object->ToPlayer())
             condMeets = player->HasAchieved(ConditionValue1);
         break;
     }
     case CONDITION_TEAM:
     {
+#ifndef NPCBOT
+			    if (object->GetTypeId() == TYPEID_UNIT && object->ToCreature()->IsNPCBot() &&
+				    object->ToCreature()->GetBotAI() && !object->ToCreature()->IsFreeBot())
+				    condMeets = object->ToCreature()->GetBotOwner()->GetTeamId() == ConditionValue1;
+			    else
+#endif
         if (Player* player = object->ToPlayer())
         {
             // Xinef: DB Data compatibility...
@@ -118,12 +152,22 @@ bool Condition::Meets(ConditionSourceInfo& sourceInfo)
     }
     case CONDITION_GENDER:
     {
+#ifndef NPCBOT
+			    if (object->GetTypeId() == TYPEID_UNIT && object->ToCreature()->IsNPCBot())
+				    condMeets = object->ToCreature()->getGender() == ConditionValue1;
+			    else
+#endif
         if (Player* player = object->ToPlayer())
             condMeets = player->getGender() == ConditionValue1;
         break;
     }
     case CONDITION_SKILL:
     {
+#ifndef NPCBOT
+			    if (object->GetTypeId() == TYPEID_UNIT && object->ToCreature()->IsNPCBot())
+				    condMeets = true;
+			    else
+#endif
         if (Player* player = object->ToPlayer())
             condMeets = player->HasSkill(ConditionValue1) && player->GetBaseSkillValue(ConditionValue1) >= ConditionValue2;
         break;
@@ -208,6 +252,11 @@ bool Condition::Meets(ConditionSourceInfo& sourceInfo)
         break;
     case CONDITION_SPELL:
     {
+#ifndef NPCBOT
+			    if (object->GetTypeId() == TYPEID_UNIT && object->ToCreature()->GetBotAI())
+				    condMeets = object->ToCreature()->GetBotAI()->HasSpell(sSpellMgr->GetSpellInfo(ConditionValue1)->GetFirstRankSpell()->Id);
+			    else
+#endif
         if (Player* player = object->ToPlayer())
             condMeets = player->HasSpell(ConditionValue1);
         break;

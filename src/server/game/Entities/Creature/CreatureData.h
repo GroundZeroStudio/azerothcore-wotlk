@@ -74,6 +74,10 @@ enum CreatureFlagsExtra : uint32
     CREATURE_FLAG_EXTRA_UNUSED_26                       = 0x02000000,
     CREATURE_FLAG_EXTRA_UNUSED_27                       = 0x04000000,
     CREATURE_FLAG_EXTRA_UNUSED_28                       = 0x08000000,
+#ifndef NPCBOT
+    CREATURE_FLAG_EXTRA_NPCBOT = 0x04000000,       // custom flag for NPCBots (not confirmed safe)
+    CREATURE_FLAG_EXTRA_NPCBOT_PET = 0x08000000,       // custom flag for NPCBot pets (not confirmed safe)
+#endif
     CREATURE_FLAG_EXTRA_DUNGEON_BOSS                    = 0x10000000,   // creature is a dungeon boss (SET DYNAMICALLY, DO NOT ADD IN DB)
     CREATURE_FLAG_EXTRA_IGNORE_PATHFINDING              = 0x20000000,   // creature ignore pathfinding
     CREATURE_FLAG_EXTRA_IMMUNITY_KNOCKBACK              = 0x40000000,   // creature is immune to knockback effects
@@ -380,7 +384,7 @@ struct CreatureData
     uint32 npcflag{0};
     uint32 unit_flags{0};                                      // enum UnitFlags mask values
     uint32 dynamicflags{0};
-    uint32 ScriptId;
+    uint32 ScriptId{0};
     bool dbData{true};
     bool overwrittenZ{false};
 };

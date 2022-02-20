@@ -327,14 +327,18 @@ bool CreatureAI::_EnterEvadeMode()
 
 void CreatureAI::MoveCircleChecks()
 {
-    Unit *victim = me->GetVictim();
+    Unit* victim = me->GetVictim();
 
     if (
         !victim ||
         !me->IsFreeToMove() || me->HasUnitMovementFlag(MOVEMENTFLAG_ROOT) ||
         !me->IsWithinMeleeRange(victim) || me == victim->GetVictim() ||
+#ifndef NPCBOT
+        (victim->GetTypeId() != TYPEID_PLAYER && !victim->IsPet() && !victim->IsNPCBot())
+#else
         (victim->GetTypeId() != TYPEID_PLAYER && !victim->IsPet())  // only player & pets to save CPU
-    )
+#endif
+        )
     {
         return;
     }
@@ -343,13 +347,17 @@ void CreatureAI::MoveCircleChecks()
 }
 
 void CreatureAI::MoveBackwardsChecks() {
-    Unit *victim = me->GetVictim();
+    Unit* victim = me->GetVictim();
 
     if (
         !victim ||
         !me->IsFreeToMove() || me->HasUnitMovementFlag(MOVEMENTFLAG_ROOT) ||
+#ifndef NPCBOT
+        (victim->GetTypeId() != TYPEID_PLAYER && !victim->IsPet() && !victim->IsNPCBot())
+#else
         (victim->GetTypeId() != TYPEID_PLAYER && !victim->IsPet())
-    )
+#endif
+        )
     {
         return;
     }

@@ -781,6 +781,10 @@ public:
     double rand_norm()                      { return m_caster->GetMap()->mtRand.randExc(); }
     double rand_chance()                    { return m_caster->GetMap()->mtRand.randExc(100.0); }
 #endif
+    #ifndef NPCBOT
+    public:
+    int32 GetTimer() const { return m_timer; }
+    #endif
 };
 
 namespace Acore

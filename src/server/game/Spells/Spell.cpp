@@ -55,6 +55,9 @@
 #include "Vehicle.h"
 #include "World.h"
 #include "WorldPacket.h"
+#ifndef NPCBOT
+#include "botmgr.h"
+#endif
 
 extern pEffect SpellEffects[TOTAL_SPELL_EFFECTS];
 
@@ -607,6 +610,14 @@ Spell::Spell(Unit* caster, SpellInfo const* info, TriggerCastFlags triggerFlags,
             if (Item* pItem = m_caster->ToPlayer()->GetWeaponForAttack(RANGED_ATTACK))
                 m_spellSchoolMask = SpellSchoolMask(1 << pItem->GetTemplate()->Damage[0].DamageType);
 
+#ifndef NPCBOT
+	if (m_attackType == RANGED_ATTACK && m_caster->GetTypeId() == TYPEID_UNIT && m_caster->ToCreature()->IsNPCBot() &&
+		((1 << (m_caster->ToCreature()->GetBotClass() - 1)) & CLASSMASK_WAND_USERS))
+	{
+		if (Item const* pItem = m_caster->ToCreature()->GetBotEquips(2))
+			m_spellSchoolMask = SpellSchoolMask(1 << pItem->GetTemplate()->Damage[0].DamageType);
+	}
+#endif
     if (originalCasterGUID)
         m_originalCasterGUID = originalCasterGUID;
     else
@@ -1562,8 +1573,12 @@ void Spell::SelectImplicitCasterObjectTargets(SpellEffIndex effIndex, SpellImpli
             break;
         case TARGET_UNIT_PET:
             target = m_caster->GetGuardianPet();
-            if (!target)
-                target = m_caster->GetCharm();
+#ifndef NPCBOT
+			if (!target && m_caster->GetTypeId() == TYPEID_UNIT && m_caster->ToCreature()->IsNPCBot())
+				target = m_caster->ToCreature()->GetBotsPet();
+#endif
+			if (!target)
+				target = m_caster->GetCharm();
             break;
         case TARGET_UNIT_SUMMONER:
             if (m_caster->IsSummon())
@@ -1620,6 +1635,11 @@ void Spell::SelectImplicitChainTargets(SpellEffIndex effIndex, SpellImplicitTarg
     uint32 maxTargets = m_spellInfo->Effects[effIndex].ChainTarget;
     if (Player* modOwner = m_caster->GetSpellModOwner())
         modOwner->ApplySpellMod(m_spellInfo->Id, SPELLMOD_JUMP_TARGETS, maxTargets, this);
+
+#ifndef NPCBOT
+	if (m_caster->GetTypeId() == TYPEID_UNIT && m_caster->ToCreature()->IsNPCBot())
+		m_caster->ToCreature()->ApplyCreatureSpellMaxTargetsMods(m_spellInfo, maxTargets);
+#endif
 
     if (maxTargets > 1)
     {
@@ -3185,6 +3205,11 @@ bool Spell::UpdateChanneledTargetList()
         if (Player* modOwner = m_caster->GetSpellModOwner())
             modOwner->ApplySpellMod(m_spellInfo->Id, SPELLMOD_RANGE, range, this);
 
+#ifndef NPCBOT
+		if (m_caster->GetTypeId() == TYPEID_UNIT && m_caster->ToCreature()->IsNPCBot())
+			m_caster->ToCreature()->ApplyCreatureSpellRangeMods(m_spellInfo, range);
+#endif
+
         // xinef: add little tolerance level
         range += std::min(3.0f, range * 0.1f); // 10% but no more than 3yd
     }
@@ -3624,6 +3649,11 @@ void Spell::_cast(bool skipCheck)
 
             finish(false);
             SetExecutedCurrently(false);
+
+#ifndef NPCBOT
+			if (m_caster->GetTypeId() == TYPEID_UNIT && m_caster->ToCreature()->IsNPCBotOrPet())
+				BotMgr::OnBotSpellGo(m_caster->ToCreature(), this, false);
+#endif
             return;
         }
 
@@ -3796,6 +3826,17 @@ void Spell::_cast(bool skipCheck)
         // Immediate spell, no big deal
         handle_immediate();
     }
+
+#ifndef NPCBOT
+    if (m_caster->GetTypeId() == TYPEID_UNIT && m_caster->ToCreature()->IsNPCBotOrPet())
+        BotMgr::OnBotSpellGo(m_caster->ToCreature(), this);
+    //npcbot - hook for master's spellcast finish
+    else if (m_caster->GetTypeId() == TYPEID_PLAYER && m_caster->ToPlayer()->HaveBot())
+        BotMgr::OnBotOwnerSpellGo(m_caster->ToPlayer(), this);
+    //npcbot - hook for master's vehicle spellcast finish
+    else if (m_caster->ToUnit() && m_caster->ToUnit()->IsVehicle())
+        BotMgr::OnVehicleSpellGo(m_caster->ToUnit(), this);
+#endif
 
     if (IsAutoActionResetSpell())
     {
@@ -4096,6 +4137,12 @@ void Spell::_handle_finish_phase()
 
 void Spell::SendSpellCooldown()
 {
+#ifndef NPCBOT
+	if (m_caster->GetTypeId() == TYPEID_UNIT &&
+		(m_caster->ToCreature()->IsNPCBot() || m_caster->ToCreature()->IsNPCBotPet()))
+		return;
+#endif
+
     // xinef: properly add creature cooldowns
     if (m_caster->GetTypeId() != TYPEID_PLAYER)
     {
@@ -4291,6 +4338,9 @@ void Spell::finish(bool ok)
 
     // Stop Attack for some spells
     if (m_spellInfo->HasAttribute(SPELL_ATTR0_CANCELS_AUTO_ATTACK_COMBAT))
+#ifndef NPCBOT
+        if (!(m_caster->GetTypeId() == TYPEID_UNIT && m_caster->ToCreature()->IsNPCBot()))
+#endif
         m_caster->AttackStop();
 }
 
@@ -5023,9 +5073,39 @@ void Spell::TakePower()
                     }
     }
 
+#ifndef NPCBOT
+	if (m_caster->GetTypeId() == TYPEID_UNIT && m_caster->ToCreature()->IsNPCBot() && m_caster->ToCreature()->GetBotClass() == CLASS_DRUID)
+	{
+		if (PowerType == POWER_ENERGY/* || powerType == POWER_RAGE || powerType == POWER_RUNE*/)
+		{
+			if (ObjectGuid targetGUID = m_targets.GetUnitTargetGUID())
+			{
+				//auto ihit = std::find_if(std::being());
+				for (auto ihit = m_UniqueTargetInfo.begin(); ihit != m_UniqueTargetInfo.end(); ++ihit)
+				{
+					if (ihit->targetGUID == targetGUID && ihit->missCondition != SPELL_MISS_NONE)
+					{
+						hit = false;
+						//Primal Precision: 80% refund
+						if ((m_spellInfo->SpellFamilyFlags[0] & 0x800000) || (m_spellInfo->SpellFamilyFlags[1] & 0x10000080))
+							m_powerCost = m_powerCost / 5;
+					}
+					break;
+				}
+			}
+		}
+	}
+#endif
+
     if (PowerType == POWER_RUNE)
     {
         TakeRunePower(hit);
+
+#ifndef NPCBOT
+		if (m_caster->GetTypeId() == TYPEID_UNIT && m_caster->ToCreature()->IsNPCBot() && m_caster->ToCreature()->GetBotClass() == CLASS_DEATH_KNIGHT)
+			m_caster->ToCreature()->SpendBotRunes(m_spellInfo, hit);
+#endif
+
         return;
     }
 
@@ -5367,6 +5447,18 @@ SpellCastResult Spell::CheckCast(bool strict)
         }
         else if (!IsTriggered() && m_caster->GetTypeId() == TYPEID_UNIT && m_caster->ToCreature()->IsSpellProhibited(m_spellInfo->GetSchoolMask()))
             return SPELL_FAILED_NOT_READY;
+
+#ifndef NPCBOT
+		if (m_caster->GetTypeId() == TYPEID_UNIT && !m_caster->ToCreature()->IsNPCBot() &&
+           (m_caster->HasSpellCooldown(SPELL_RELIC_COOLDOWN) && !m_caster->HasSpellItemCooldown(SPELL_RELIC_COOLDOWN, m_CastItem->GetEntry())))
+		{
+			//TC_LOG_ERROR("spells", "%s has cd of %u on %s", m_caster->GetName().c_str(), m_caster->ToCreature()->GetCreatureSpellCooldownDelay(m_spellInfo->Id), m_spellInfo->SpellName[0]);
+			if (m_triggeredByAuraSpell)
+				return SPELL_FAILED_DONT_REPORT;
+			else
+				return SPELL_FAILED_NOT_READY;
+		}
+#endif
     }
 
     if (m_spellInfo->HasAttribute(SPELL_ATTR7_DEBUG_SPELL) && !m_caster->HasFlag(UNIT_FIELD_FLAGS_2, UNIT_FLAG2_ALLOW_CHEAT_SPELLS))
@@ -5596,6 +5688,11 @@ SpellCastResult Spell::CheckCast(bool strict)
     {
         if (m_spellInfo->Effects[j].TargetA.GetTarget() == TARGET_UNIT_PET)
         {
+#ifndef NPCBOT
+			if (m_caster->GetTypeId() == TYPEID_UNIT && m_caster->ToCreature()->IsNPCBot() && m_caster->ToCreature()->GetBotsPet())
+				break;
+			else
+#endif
             if (!m_caster->GetGuardianPet() && !m_caster->GetCharm())
             {
                 if (m_triggeredByAuraSpell.spellInfo) // not report pet not existence for triggered spells
@@ -5621,6 +5718,12 @@ SpellCastResult Spell::CheckCast(bool strict)
                 return SPELL_FAILED_NOT_IN_ARENA;
 
     // zone check
+#ifndef NPCBOT
+	if (m_caster->GetTypeId() == TYPEID_UNIT && m_caster->ToCreature()->IsNPCBot())
+	{
+	}
+	else
+#endif
     if (m_caster->GetTypeId() == TYPEID_UNIT || !m_caster->ToPlayer()->IsGameMaster())
     {
         uint32 zone, area;
@@ -6694,6 +6797,11 @@ SpellCastResult Spell::CheckRange(bool strict)
 
     if (Player* modOwner = m_caster->GetSpellModOwner())
         modOwner->ApplySpellMod(m_spellInfo->Id, SPELLMOD_RANGE, max_range, this);
+
+#ifndef NPCBOT
+	if (m_caster->GetTypeId() == TYPEID_UNIT && m_caster->ToCreature()->IsNPCBot())
+		m_caster->ToCreature()->ApplyCreatureSpellRangeMods(m_spellInfo, max_range);
+#endif
 
     // xinef: dont check max_range to strictly after cast
     if (range_type != SPELL_RANGE_MELEE && !strict)
@@ -8024,6 +8132,13 @@ SpellCastResult Spell::CanOpenLock(uint32 effIndex, uint32 lockId, SkillType& sk
                         // castitem check: rogue using skeleton keys. the skill values should not be added in this case.
                         skillValue = m_CastItem || m_caster->GetTypeId() != TYPEID_PLAYER ?
                                      0 : m_caster->ToPlayer()->GetSkillValue(skillId);
+
+#ifndef NPCBOT
+						if (m_originalCasterGUID)
+							if (Unit const* unit = ObjectAccessor::GetUnit(*m_caster, m_originalCasterGUID))
+								if (unit->GetTypeId() == TYPEID_UNIT && unit->ToCreature()->GetBotClass() == CLASS_ROGUE)
+									skillValue = std::max<int32>(skillValue, int32(unit->getLevel() * 5));
+#endif
 
                         // skill bonus provided by casting spell (mostly item spells)
                         // add the effect base points modifier from the spell casted (cheat lock / skeleton key etc.)

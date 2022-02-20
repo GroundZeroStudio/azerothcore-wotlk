@@ -25,6 +25,9 @@
 #include "SpellAuraDefines.h"
 #include "SpellAuraEffects.h"
 #include "SpellMgr.h"
+#ifndef NPCBOT
+#include "botmgr.h"
+#endif
 
 uint32 GetTargetFlagMask(SpellTargetObjectTypes objType)
 {
@@ -448,6 +451,30 @@ int32 SpellEffectInfo::CalcValue(Unit const* caster, int32 const* bp, Unit const
     // random damage
     if (caster)
     {
+        #ifndef NPCBOT
+        float pointsPerComboPoint = PointsPerComboPoint;
+        if (_spellInfo->Id == 57143 && _effIndex == 1)
+        {
+        basePoints = 2500;
+        value = float(basePoints);
+        pointsPerComboPoint = 2500.f;
+        }
+        //npcbot: bonus amount from combo points and specific mods
+        if (caster->GetTypeId() == TYPEID_UNIT && caster->ToCreature()->IsNPCBot())
+        {
+        if (uint8 comboPoints = caster->ToCreature()->GetCreatureComboPoints())
+        value += pointsPerComboPoint * comboPoints;
+        }
+        //npcbot: bonus amount from combo points (vehicle)
+        else if (caster->IsVehicle() && caster->GetTypeId() == TYPEID_UNIT && caster->GetCharmerGUID().IsCreature() &&
+        PointsPerComboPoint)
+        {
+        Unit const* bot = caster->GetCharmer();
+        if (bot && bot->ToCreature()->IsNPCBot())
+        if (uint8 comboPoints = bot->ToCreature()->GetCreatureComboPoints())
+        value += pointsPerComboPoint * comboPoints;
+        }
+        #endif
         // bonus amount from combo points
         if (uint8 comboPoints = caster->GetComboPoints())
         {
@@ -553,6 +580,10 @@ float SpellEffectInfo::CalcRadius(Unit* caster, Spell* spell) const
         radius = std::min(radius, RadiusEntry->RadiusMax);
         if (Player* modOwner = caster->GetSpellModOwner())
             modOwner->ApplySpellMod(_spellInfo->Id, SPELLMOD_RADIUS, radius, spell);
+        #ifndef NPCBOT
+             if (caster->GetTypeId() == TYPEID_UNIT && caster->ToCreature()->IsNPCBot())
+             caster->ToCreature()->ApplyCreatureSpellRadiusMods(_spellInfo, radius);
+        #endif
     }
 
     return radius;
@@ -1825,6 +1856,9 @@ SpellCastResult SpellInfo::CheckTarget(Unit const* caster, WorldObject const* ta
 
     // corpseOwner and unit specific target checks
     if (AttributesEx3 & SPELL_ATTR3_ONLY_ON_PLAYER && !unitTarget->ToPlayer())
+    #ifndef NPCBOT
+    if (!(unitTarget->GetTypeId() == TYPEID_UNIT && unitTarget->ToCreature()->IsNPCBot()))
+    #endif
         return SPELL_FAILED_TARGET_NOT_PLAYER;
 
     if (!IsAllowingDeadTarget() && !unitTarget->IsAlive())
@@ -2374,6 +2408,10 @@ int32 SpellInfo::CalcPowerCost(Unit const* caster, SpellSchoolMask schoolMask, S
 
     // Base powerCost
     int32 powerCost = ManaCost;
+    #ifndef NPCBOT
+        if (powerCost > 0 && caster->GetTypeId() == TYPEID_UNIT && caster->ToCreature()->IsNPCBot())
+        caster->ToCreature()->ApplyCreatureSpellCostMods(this, powerCost);
+    #endif
     // PCT cost from total amount
     if (ManaCostPercentage)
     {

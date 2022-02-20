@@ -301,7 +301,7 @@ public:
                 room = GetData(GANDLING_ROOM_TO_USE);
                 SetGate(room, CLOSED);
                 SpawnMobsInRoom(room);
-                DoCast(target, GandlingPortalSpells[room], true); // needs triggered somehow.
+                //DoCast(target, GandlingPortalSpells[room], true); // needs triggered somehow.//删掉了院长传送怕BOT宕机
                 if (target->GetGUID() == me->GetVictim()->GetGUID())
                 {
                     me->AddThreat(me->GetVictim(), -1000000); // drop current player, add a ton to second. This should guarantee that we don't end up with both 1 and 2 in a cage...

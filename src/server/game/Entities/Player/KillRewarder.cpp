@@ -22,6 +22,11 @@
 #include "Player.h"
 #include "SpellAuraEffects.h"
 
+#ifndef NPCBOT
+#include "botdatamgr.h"
+#include "botmgr.h"
+#endif
+
 // KillRewarder incapsulates logic of rewarding player upon kill with:
 // * XP;
 // * honor;
@@ -164,6 +169,17 @@ void KillRewarder::_RewardXP(Player* player, float rate)
         Unit::AuraEffectList const& auras = player->GetAuraEffectsByType(SPELL_AURA_MOD_XP_PCT);
         for (Unit::AuraEffectList::const_iterator i = auras.begin(); i != auras.end(); ++i)
             AddPct(xp, (*i)->GetAmount());
+
+#ifndef NPCBOT
+        if (player->GetNpcBotsCount() > 1)
+        {
+            if (uint8 xp_reduction = BotMgr::GetNpcBotXpReduction())
+            {
+                uint32 ratePct = std::max<int32>(100 - ((player->GetNpcBotsCount() - 1) * xp_reduction), 10);
+                xp             = xp * ratePct / 100;
+            }
+        }
+#endif
 
         // 4.2.3. Give XP to player.
         player->GiveXP(xp, _victim, _groupRate);

@@ -1086,6 +1086,12 @@ void WorldObject::setActive(bool on)
     if (GetTypeId() == TYPEID_PLAYER)
         return;
 
+#ifndef NPCBOT
+	if (on == false && GetTypeId() == TYPEID_UNIT && ToCreature()->IsNPCBot())
+    //if(GetTypeId() == TYPEID_UNIT && ToCreature()->IsNPCBot())
+		return;
+#endif
+
     m_isActive = on;
 
     if (on && !IsInWorld())
@@ -1861,6 +1867,9 @@ bool WorldObject::CanDetect(WorldObject const* obj, bool ignoreStealth, bool che
 {
     WorldObject const* seer = this;
 
+#ifndef NPCBOT
+    if (!(GetTypeId() == TYPEID_UNIT && ToCreature()->IsNPCBot()))
+#endif
     // Pets don't have detection, they use the detection of their masters
     if (Unit const* thisUnit = ToUnit())
         if (Unit* controller = thisUnit->GetCharmerOrOwner())
@@ -2053,7 +2062,7 @@ void WorldObject::SendObjectDeSpawnAnim(ObjectGuid guid)
 void WorldObject::SetMap(Map* map)
 {
     ASSERT(map);
-    ASSERT(!IsInWorld());
+//    ASSERT(!IsInWorld()); //解决载具宕机问题
 
     if (m_currMap == map) // command add npc: first create, than loadfromdb
     {
@@ -2176,6 +2185,11 @@ TempSummon* Map::SummonCreature(uint32 entry, Position const& pos, SummonPropert
             summon = new Puppet(properties, summoner ? summoner->GetGUID() : ObjectGuid::Empty);
             break;
         case UNIT_MASK_TOTEM:
+#ifndef NPCBOT
+			if (summoner && summoner->GetTypeId() == TYPEID_UNIT && summoner->ToCreature()->IsNPCBot())
+				summon = new Totem(properties, summoner->ToCreature()->GetBotOwner()->GetGUID());
+			else
+#endif
             summon = new Totem(properties, summoner ? summoner->GetGUID() : ObjectGuid::Empty);
             break;
         case UNIT_MASK_MINION:
@@ -2192,6 +2206,11 @@ TempSummon* Map::SummonCreature(uint32 entry, Position const& pos, SummonPropert
         return nullptr;
     }
 
+#ifndef NPCBOT
+	if (summoner && summoner->GetTypeId() == TYPEID_UNIT && summoner->ToCreature()->IsNPCBot())
+		summon->SetCreatorGUID(summoner->GetGUID()); // see TempSummon::InitStats()
+#endif
+
     summon->SetUInt32Value(UNIT_CREATED_BY_SPELL, spellId);
 
     summon->SetHomePosition(pos);
@@ -2199,6 +2218,11 @@ TempSummon* Map::SummonCreature(uint32 entry, Position const& pos, SummonPropert
     summon->InitStats(duration);
     AddToMap(summon->ToCreature(), summon->GetOwnerGUID().IsPlayer() || (summoner && summoner->GetTransport()));
     summon->InitSummon();
+
+#ifndef NPCBOT
+	if (summoner && summoner->GetTypeId() == TYPEID_UNIT && summoner->ToCreature()->IsNPCBot())
+		summoner->ToCreature()->OnBotSummon(summon);
+#endif
 
     //ObjectAccessor::UpdateObjectVisibility(summon);
 

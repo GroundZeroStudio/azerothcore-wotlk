@@ -23,6 +23,10 @@
 #include "Player.h"
 #include "ScriptMgr.h"
 
+#ifndef NPCBOT
+#include "botmgr.h"
+#endif
+
 TempSummon::TempSummon(SummonPropertiesEntry const* properties, ObjectGuid owner, bool isWorldObject) :
     Creature(isWorldObject), m_Properties(properties), m_type(TEMPSUMMON_MANUAL_DESPAWN),
     m_timer(0), m_lifetime(0)
@@ -228,6 +232,12 @@ void TempSummon::InitStats(uint32 duration)
     if (!m_Properties)
         return;
 
+#ifndef NPCBOT
+	if (!(m_Properties->Slot && m_Properties->Slot >= SUMMON_TYPE_TOTEM_FIRE && m_Properties->Slot < MAX_TOTEM_SLOT &&
+		GetCreatorGUID() && GetCreatorGUID().IsCreature() && owner && owner->GetTypeId() == TYPEID_PLAYER &&
+		owner->ToPlayer()->HaveBot() && owner->ToPlayer()->GetBotMgr()->GetBot(GetCreatorGUID())))
+#endif
+
     if (owner)
     {
         if (uint32 slot = m_Properties->Slot)
@@ -333,6 +343,13 @@ void Minion::InitStats(uint32 duration)
     TempSummon::InitStats(duration);
 
     SetReactState(REACT_PASSIVE);
+
+#ifndef NPCBOT
+	if (m_Properties && m_Properties->Slot && m_Properties->Slot >= SUMMON_TYPE_TOTEM_FIRE && m_Properties->Slot < MAX_TOTEM_SLOT &&
+		GetCreatorGUID() && GetCreatorGUID().IsCreature() && GetOwner() && GetOwner()->GetTypeId() == TYPEID_PLAYER &&
+		GetOwner()->ToPlayer()->HaveBot() && GetOwner()->ToPlayer()->GetBotMgr()->GetBot(GetCreatorGUID()))
+		return;
+#endif
 
     Unit* owner = GetOwner();
     SetCreatorGUID(owner->GetGUID());

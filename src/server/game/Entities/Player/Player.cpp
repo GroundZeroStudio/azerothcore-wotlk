@@ -95,6 +95,11 @@
 //  see: https://github.com/azerothcore/azerothcore-wotlk/issues/9766
 #include "GridNotifiersImpl.h"
 
+#ifndef NPCBOT
+#include "botmgr.h"
+#include "botdatamgr.h"
+#endif
+
 enum CharacterFlags
 {
     CHARACTER_FLAG_NONE                 = 0x00000000,
@@ -412,6 +417,10 @@ Player::Player(WorldSession* session): Unit(true), m_mover(this)
 
     _wasOutdoor = true;
     sScriptMgr->OnConstructPlayer(this);
+
+#ifndef NPCBOT
+    _botMgr = nullptr;
+#endif
 }
 
 Player::~Player()
@@ -462,6 +471,14 @@ Player::~Player()
             u->RemovePlayerFromVision(this);
         } while (!m_isInSharedVisionOf.empty());
     }
+
+#ifndef NPCBOT
+    if (_botMgr)
+    {
+        delete _botMgr;
+        _botMgr = nullptr;
+    }
+#endif
 }
 
 void Player::CleanupsBeforeDelete(bool finalCleanup)
@@ -1040,6 +1057,11 @@ void Player::setDeathState(DeathState s, bool /*despawn = false*/)
         //FIXME: is pet dismissed at dying or releasing spirit? if second, add setDeathState(DEAD) to HandleRepopRequestOpcode and define pet unsummon here with (s == DEAD)
         RemovePet(nullptr, PET_SAVE_NOT_IN_SLOT, true);
 
+#ifndef NPCBOT
+		if (HaveBot())
+			_botMgr->OnTeleportFar(GetMapId(), GetPositionX(), GetPositionY(), GetPositionZ(), GetOrientation());
+#endif
+
         // save value before aura remove in Unit::setDeathState
         ressSpellId = GetUInt32Value(PLAYER_SELF_RES_SPELL);
 
@@ -1471,6 +1493,11 @@ bool Player::TeleportTo(uint32 mapid, float x, float y, float z, float orientati
             SendTeleportAckPacket();
             SendTeleportPacket(oldPos); // this automatically relocates to oldPos in order to broadcast the packet in the right place
         }
+
+#ifndef NPCBOT
+        if (HaveBot())
+            _botMgr->OnTeleportFar(mapid, x, y, z, orientation);
+#endif
     }
     else
     {
@@ -2235,6 +2262,11 @@ void Player::SetGameMaster(bool on)
         m_serverSideVisibilityDetect.SetValue(SERVERSIDE_VISIBILITY_GM, SEC_PLAYER);
     }
 
+#ifndef NPCBOT
+	if (HaveBot())
+		_botMgr->OnOwnerSetGameMaster(on);
+#endif
+
     UpdateObjectVisibility();
 }
 
@@ -2313,6 +2345,50 @@ void Player::RemoveFromGroup(Group* group, ObjectGuid guid, RemoveMethod method 
 {
     if (group)
     {
+#ifndef NPCBOT
+        if (Player* player = ObjectAccessor::FindPlayer(guid))
+        {
+            if (player->HaveBot())
+            {
+                //uint8 players = 0;
+                //Group::MemberSlotList const& members = group->GetMemberSlots();
+                //for (Group::member_citerator itr = members.begin(); itr!= members.end(); ++itr)
+                //{
+                //    if (Player* pl = ObjectAccessor::FindPlayer(itr->guid))
+                //        ++players;
+                //}
+
+                //remove npcbots and set up new group if needed
+                player->GetBotMgr()->RemoveAllBotsFromGroup();
+                group = player->GetGroup();
+                if (!group)
+                    return; //group has been disbanded
+            }
+        }
+        //npcbot - bot is being removed from group - find master and remove bot through botmap
+        //else if (Creature* bot = ObjectAccessor::GetObjectInOrOutOfWorld(guid, (Creature*)NULL))
+        else if (guid.IsCreature())
+        {
+            for (GroupReference* itr = group->GetFirstMember(); itr != nullptr; itr = itr->next())
+            {
+                if (Player* member = itr->GetSource())
+                {
+                    if (!member->HaveBot())
+                        continue;
+
+                    if (Creature* bot = member->GetBotMgr()->GetBot(guid))
+                    {
+                        member->GetBotMgr()->RemoveBotFromGroup(bot);
+                        return;
+                    }
+                }
+            }
+            //ASSERT(!bot->IsFreeBot());
+            //bot->GetBotOwner()->GetBotMgr()->RemoveBotFromGroup(bot, false);
+            //return;
+        }
+#endif
+
         group->RemoveMember(guid, method, kicker, reason);
         group = nullptr;
     }
@@ -2514,6 +2590,11 @@ void Player::GiveLevel(uint8 level)
     SendQuestGiverStatusMultiple();
 
     sScriptMgr->OnPlayerLevelChanged(this, oldLevel);
+
+#ifndef NPCBOT
+    if (HaveBot())
+        _botMgr->SetBotsShouldUpdateStats();
+#endif
 }
 
 void Player::InitTalentForLevel()
@@ -4217,6 +4298,11 @@ void Player::DeleteFromDB(ObjectGuid::LowType lowGuid, uint32 accountId, bool up
                 trans->Append(stmt);
 
                 Corpse::DeleteFromDB(playerGuid, trans);
+
+#ifndef NPCBOT
+                uint32 newOwner = 0;
+                BotDataMgr::UpdateNpcBotDataAll(lowGuid, NPCBOT_UPDATE_OWNER, &newOwner);
+#endif
 
                 sScriptMgr->OnDeleteFromDB(trans, lowGuid);
 
@@ -6040,6 +6126,36 @@ bool Player::RewardHonor(Unit* uVictim, uint32 groupsize, int32 honor, bool awar
             UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_SPECIAL_PVP_KILL, 1, 0, victim);
             sScriptMgr->OnVictimRewardAfter(this, victim, killer_title, victim_rank, honor_f);
         }
+#ifndef NPCBOT
+        else if (uVictim->ToCreature()->IsNPCBot() && !uVictim->ToCreature()->IsTempBot())
+        {
+            Creature const* bot = uVictim->ToCreature();
+
+            uint32 check1 = GetFaction();
+            uint32 check2 = bot->GetFaction();
+
+            if (!bot->IsFreeBot())
+            {
+                check1 = GetTeamId();
+                check2 = bot->GetBotOwner()->GetTeamId();
+            }
+
+            if (check1 == check2 && !sWorld->IsFFAPvPRealm())
+                return false;
+
+            uint8 k_level = getLevel();
+            uint8 k_grey = Acore::XP::GetGrayLevel(k_level);
+            uint8 v_level = uVictim->getLevel();
+
+            if (v_level <= k_grey)
+                return false;
+
+            victim_guid.Clear(); // Don't show HK: <rank> message, only log.
+
+            //TODO: honor gain rate
+            honor_f = ceil(Acore::Honor::hk_honor_at_level_f(k_level) * (v_level - k_grey) / (k_level - k_grey));
+        }
+#endif
         else
         {
             if (!uVictim->ToCreature()->IsRacialLeader())
@@ -10407,6 +10523,18 @@ bool Player::BuyItemFromVendorSlot(ObjectGuid vendorguid, uint32 vendorslot, uin
         return false;
     }
 
+#ifndef NPCBOT
+    if (HaveBot())
+    {
+        if (!(pProto->AllowableClass & (getClassMask() | GetBotMgr()->GetAllNpcBotsClassMask())) && pProto->Bonding == BIND_WHEN_PICKED_UP && !IsGameMaster())
+        {
+            SendBuyError(BUY_ERR_CANT_FIND_ITEM, nullptr, item, 0);
+            return false;
+        }
+    }
+    else
+#endif
+
     if (!(pProto->AllowableClass & getClassMask()) && pProto->Bonding == BIND_WHEN_PICKED_UP && !IsGameMaster())
     {
         SendBuyError(BUY_ERR_CANT_FIND_ITEM, nullptr, item, 0);
@@ -12237,6 +12365,14 @@ bool Player::isHonorOrXPTarget(Unit* victim) const
     // Victim level less gray level
     if (v_level <= k_grey)
         return false;
+
+#ifndef NPCBOT
+    if (Creature* pCreature = victim->ToCreature())
+    {
+        if (pCreature->IsNPCBotOrPet())
+            return true;
+    }
+#endif
 
     if (victim->GetTypeId() == TYPEID_UNIT)
     {
@@ -15880,3 +16016,24 @@ uint32 Player::GetSpellCooldownDelay(uint32 spell_id) const
     SpellCooldowns::const_iterator itr = m_spellCooldowns.find(spell_id);
     return uint32(itr != m_spellCooldowns.end() && itr->second.end > getMSTime() ? itr->second.end - getMSTime() : 0);
 }
+
+#ifndef NPCBOT
+bool Player::HaveBot() const
+{
+    return _botMgr && _botMgr->HaveBot();
+}
+uint8 Player::GetNpcBotsCount() const
+{
+    return _botMgr ? _botMgr->GetNpcBotsCount() : 0;
+}
+void Player::RemoveAllBots(uint8 removetype)
+{
+    if (_botMgr)
+        _botMgr->RemoveAllBots(removetype);
+}
+void Player::UpdatePhaseForBots()
+{
+    if (_botMgr)
+        _botMgr->UpdatePhaseForBots();
+}
+#endif

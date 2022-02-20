@@ -72,6 +72,10 @@
 #include "StringConvert.h"
 #include <math.h>
 
+ #ifndef NPCBOT
+ #include "botmgr.h"
+ #endif
+
 float baseMoveSpeed[MAX_MOVE_TYPE] =
 {
     2.5f,                  // MOVE_WALK
@@ -765,6 +769,21 @@ uint32 Unit::DealDamage(Unit* attacker, Unit* victim, uint32 damage, CleanDamage
 
         if (attacker && attacker->IsAIEnabled)
             attacker->GetAI()->DamageDealt(victim, damage, damagetype);
+        #ifndef NPCBOT
+        if (attacker && attacker->GetTypeId() == TYPEID_UNIT && attacker->ToCreature()->IsNPCBot())
+        BotMgr::OnBotDamageDealt(attacker, victim, damage, cleanDamage, damagetype, spellProto);
+        //end npcbot
+
+        //npcbot: damage tracker hook
+        if (damage > 0 && damage < victim->GetHealth())
+        {
+        Player const* botowner = victim->GetTypeId() == TYPEID_PLAYER ? victim->ToPlayer() :
+        victim->ToCreature()->IsNPCBot() && !victim->ToCreature()->IsFreeBot() ? victim->ToCreature()->GetBotOwner() : nullptr;
+
+        if (botowner && botowner->GetBotMgr() && (botowner->HaveBot() || (botowner->GetGroup() && botowner->GetGroup()->IsMember(victim->GetGUID()))))
+        botowner->GetBotMgr()->TrackDamage(victim, damage);
+        }
+        #endif
     }
 
     // Hook for OnDamage Event
@@ -1252,6 +1271,17 @@ void Unit::CalculateSpellDamageTaken(SpellNonMeleeDamage* damageInfo, int32 dama
         case SPELL_DAMAGE_CLASS_RANGED:
         case SPELL_DAMAGE_CLASS_MELEE:
             {
+        #ifndef NPCBOT
+        if (GetTypeId() == TYPEID_UNIT && ToCreature()->IsNPCBotOrPet())
+        {
+        //TODO: rename to ApplyBotDamageMultiplierPhysical
+        ToCreature()->ApplyBotDamageMultiplierMelee(damage, *damageInfo, spellInfo, attackType, crit);
+        if (damageSchoolMask & SPELL_SCHOOL_MASK_NORMAL)
+        damage *= BotMgr::GetBotDamageModPhysical();
+        else if (damageSchoolMask & SPELL_SCHOOL_MASK_MAGIC)
+        damage *= BotMgr::GetBotDamageModSpell();
+        }
+        #endif
                 // Physical Damage
                 if (damageSchoolMask & SPELL_SCHOOL_MASK_NORMAL)
                 {
@@ -1319,6 +1349,16 @@ void Unit::CalculateSpellDamageTaken(SpellNonMeleeDamage* damageInfo, int32 dama
         case SPELL_DAMAGE_CLASS_NONE:
         case SPELL_DAMAGE_CLASS_MAGIC:
             {
+            #ifndef NPCBOT
+            if (GetTypeId() == TYPEID_UNIT && ToCreature()->IsNPCBotOrPet())
+            {
+            ToCreature()->ApplyBotDamageMultiplierSpell(damage, *damageInfo, spellInfo, attackType, crit);
+            if (damageSchoolMask & SPELL_SCHOOL_MASK_NORMAL)
+            damage *= BotMgr::GetBotDamageModPhysical();
+            else if (damageSchoolMask & SPELL_SCHOOL_MASK_MAGIC)
+            damage *= BotMgr::GetBotDamageModSpell();
+            }
+            #endif
                 // If crit add critical bonus
                 if (crit)
                 {
@@ -1437,6 +1477,17 @@ void Unit::CalculateMeleeDamage(Unit* victim, uint32 damage, CalcDamageInfo* dam
     // Script Hook For CalculateMeleeDamage -- Allow scripts to change the Damage pre class mitigation calculations
     sScriptMgr->ModifyMeleeDamage(damageInfo->target, damageInfo->attacker, damage);
 
+#ifndef NPCBOT
+    if (GetTypeId() == TYPEID_UNIT && ToCreature()->IsNPCBotOrPet())
+    {
+        damageInfo->damage = damage;
+        //damage is unused. TODO: remove this redundant argument
+        ToCreature()->ApplyBotDamageMultiplierMelee(damageInfo->damage, *damageInfo);
+        damage = damageInfo->damage;
+        damage *= BotMgr::GetBotDamageModPhysical();
+    }
+#endif
+
     // Calculate armor reduction
     if (IsDamageReducedByArmor((SpellSchoolMask)(damageInfo->damageSchoolMask)))
     {
@@ -1445,6 +1496,12 @@ void Unit::CalculateMeleeDamage(Unit* victim, uint32 damage, CalcDamageInfo* dam
     }
     else
         damageInfo->damage = damage;
+
+#ifndef NPCBOT
+    if (GetTypeId() == TYPEID_UNIT && ToCreature()->IsNPCBot())
+        damageInfo->hitOutCome = ToCreature()->BotRollMeleeOutcomeAgainst(damageInfo->target, damageInfo->attackType);
+    else
+#endif
 
     damageInfo->hitOutCome = RollMeleeOutcomeAgainst(damageInfo->target, damageInfo->attackType);
 
@@ -1674,6 +1731,14 @@ void Unit::DealMeleeDamage(CalcDamageInfo* damageInfo, bool durabilityLoss)
     if (GetTypeId() == TYPEID_PLAYER)
         ToPlayer()->CastItemCombatSpell(victim, damageInfo->attackType, damageInfo->procVictim, damageInfo->procEx);
 
+#ifndef NPCBOT
+    else if (ToCreature()->IsNPCBot())
+    {
+        DamageInfo dmgInfo(*damageInfo);
+        ToCreature()->CastCreatureItemCombatSpell(victim, damageInfo->attackType, damageInfo->procVictim, damageInfo->damageSchoolMask);
+    }
+#endif
+
     // Do effect if any damage done to target
     if (damageInfo->damage)
     {
@@ -1822,6 +1887,15 @@ uint32 Unit::CalcArmorReducedDamage(Unit const* attacker, Unit const* victim, co
             armor -= std::min(armorPen, maxArmorPen);
         }
     }
+
+#ifndef NPCBOT
+    if (attacker && attacker->GetTypeId() == TYPEID_UNIT && attacker->ToCreature()->IsNPCBot())
+    {
+        // SPELL_AURA_MOD_ARMOR_PENETRATION_PCT is handled in class mods
+        // No cap
+        armor -= CalculatePct(armor, attacker->ToCreature()->GetCreatureArmorPenetrationCoef());
+    }
+#endif
 
     if (armor < 0.0f)
         armor = 0.0f;
@@ -2482,6 +2556,15 @@ MeleeHitOutcome Unit::RollMeleeOutcomeAgainst(Unit const* victim, WeaponAttackTy
     float block_chance = victim->GetUnitBlockChance();
     float parry_chance = victim->GetUnitParryChance();
 
+#ifndef NPCBOT
+    if (GetTypeId() == TYPEID_UNIT && ToCreature()->IsNPCBot())
+    {
+        int32 reductionFromExpertise = ToCreature()->GetCreatureExpertise() * 100 / 4;
+        dodge_chance -= reductionFromExpertise;
+        parry_chance -= reductionFromExpertise;
+    }
+#endif
+
     // Useful if want to specify crit & miss chances for melee, else it could be removed
     //LOG_DEBUG("entities.unit", "MELEE OUTCOME: miss {} crit {} dodge {} parry {} block {}", miss_chance, crit_chance, dodge_chance, parry_chance, block_chance);
 
@@ -3052,6 +3135,11 @@ SpellMissInfo Unit::MagicSpellHitResult(Unit* victim, SpellInfo const* spellInfo
     }
     else
         HitChance += int32(m_modSpellHitChance * 100.0f);
+
+#ifndef NPCBOT
+    if (GetTypeId() == TYPEID_UNIT && ToCreature()->IsNPCBot())
+        HitChance -= int32(ToCreature()->GetCreatureMissChance() * 100.f);
+#endif
 
     if (HitChance < 100)
         HitChance = 100;
@@ -9928,6 +10016,18 @@ void Unit::CombatStopWithPets(bool includingCast)
 
     for (ControlSet::const_iterator itr = m_Controlled.begin(); itr != m_Controlled.end(); ++itr)
         (*itr)->CombatStop(includingCast);
+#ifndef NPCBOT
+    if (GetTypeId() == TYPEID_PLAYER && ToPlayer()->HaveBot())
+    {
+        BotMap const* map = ToPlayer()->GetBotMgr()->GetBotMap();
+        for (BotMap::const_iterator itr = map->begin(); itr != map->end(); ++itr)
+        {
+            itr->second->CombatStop(includingCast);
+            if (Unit* botPet = itr->second->GetBotsPet())
+                botPet->CombatStop(includingCast);
+        }
+    }
+#endif
 }
 
 bool Unit::isAttackingPlayer() const
@@ -10577,6 +10677,10 @@ Unit* Unit::GetNextRandomRaidMemberOrPet(float radius)
     // Should we enable this also for charmed units?
     else if (GetTypeId() == TYPEID_UNIT && IsPet())
         player = GetOwner()->ToPlayer();
+#ifndef NPCBOT
+    if (!player && GetTypeId() == TYPEID_UNIT && ToCreature()->IsNPCBot() && !ToCreature()->IsFreeBot())
+        player = ToCreature()->GetBotOwner();
+#endif
 
     if (!player)
         return nullptr;
@@ -10608,6 +10712,24 @@ Unit* Unit::GetNextRandomRaidMemberOrPet(float radius)
             // IsHostileTo check duel and controlled by enemy
             if (Target != this && Target->IsAlive() && !IsHostileTo(Target))
                 nearMembers.push_back(Target);
+#ifndef NPCBOT
+            if (Target->HaveBot())
+            {
+                BotMap const* botMap = Target->GetBotMgr()->GetBotMap();
+                for (BotMap::const_iterator it = botMap->begin(); it != botMap->end(); ++it)
+                {
+                    if (group->IsMember(it->second->GetGUID()))
+                    {
+                        if (it->second != this && it->second->IsAlive() &&
+                            IsWithinDistInMap(it->second, radius) && !IsHostileTo(it->second))
+                            nearMembers.push_back(it->second);
+                        //if (Unit* botpet = it->second->GetBotsPet())
+                        //    if (botpet != this && botpet->IsAlive() && IsWithinDistInMap(botpet, radius) && !IsHostileTo(botpet))
+                        //        nearMembers.push_back(botpet);
+                    }
+                }
+            }
+#endif
 
             // Push player's pet to vector
             if (Unit* pet = Target->GetGuardianPet())
@@ -11154,6 +11276,10 @@ uint32 Unit::SpellDamageBonusDone(Unit* victim, SpellInfo const* spellProto, uin
 
     // Done fixed damage bonus auras
     int32 DoneAdvertisedBenefit  = SpellBaseDamageBonusDone(spellProto->GetSchoolMask());
+#ifndef NPCBOT
+    if ((spellProto->GetSchoolMask() & SPELL_SCHOOL_MASK_MAGIC) && GetTypeId() == TYPEID_UNIT && ToCreature()->IsNPCBot())
+        DoneAdvertisedBenefit += ToCreature()->GetCreatureSpellPower();
+#endif
 
     // Check for table values
     float coeff = 0;
@@ -11414,6 +11540,9 @@ float Unit::SpellDoneCritChance(Unit const* /*victim*/, SpellInfo const* spellPr
 {
     // Mobs can't crit with spells.
     if (GetTypeId() == TYPEID_UNIT && !GetSpellModOwner())
+#ifndef NPCBOT
+        if (!ToCreature()->IsNPCBotOrPet())
+#endif
         return -100.0f;
 
     // not critting spell
@@ -11692,6 +11821,10 @@ float Unit::SpellTakenCritChance(Unit const* caster, SpellInfo const* spellProto
     // xinef: should be calculated at the end
     if (!spellProto->IsPositive())
         crit_chance += GetTotalAuraModifier(SPELL_AURA_MOD_ATTACKER_SPELL_AND_WEAPON_CRIT_CHANCE);
+#ifndef NPCBOT
+    if (caster && caster->GetTypeId() == TYPEID_UNIT && caster->ToCreature()->IsNPCBot())
+        caster->ToCreature()->ApplyBotCritMultiplierAll(this, crit_chance, spellProto, schoolMask, attackType);
+#endif
 
     // xinef: can be negative!
     return crit_chance;
@@ -11973,6 +12106,10 @@ uint32 Unit::SpellHealingBonusDone(Unit* victim, SpellInfo const* spellProto, ui
 
     if (Player* modOwner = GetSpellModOwner())
         modOwner->ApplySpellMod(spellProto->Id, damagetype == DOT ? SPELLMOD_DOT : SPELLMOD_DAMAGE, heal);
+#ifndef NPCBOT
+    if (GetTypeId() == TYPEID_UNIT && ToCreature()->IsNPCBot())
+        ToCreature()->ApplyBotDamageMultiplierHeal(victim, heal, spellProto, damagetype, stack);
+#endif
 
     return uint32(std::max(heal, 0.0f));
 }
@@ -12117,6 +12254,10 @@ int32 Unit::SpellBaseHealingBonusDone(SpellSchoolMask schoolMask)
     for (AuraEffectList::const_iterator i = mHealingDone.begin(); i != mHealingDone.end(); ++i)
         if (!(*i)->GetMiscValue() || ((*i)->GetMiscValue() & schoolMask) != 0)
             AdvertisedBenefit += (*i)->GetAmount();
+#ifndef NPCBOT
+    if (GetTypeId() == TYPEID_UNIT && ToCreature()->IsNPCBot())
+        AdvertisedBenefit += ToCreature()->GetCreatureSpellPower();
+#endif
 
     // Healing bonus of spirit, intellect and strength
     if (GetTypeId() == TYPEID_PLAYER)
@@ -12603,7 +12744,10 @@ uint32 Unit::MeleeDamageBonusTaken(Unit* attacker, uint32 pdamage, WeaponAttackT
     float TakenTotalMod = 1.0f;
 
     TakenTotalMod *= GetTotalAuraMultiplierByMiscMask(SPELL_AURA_MOD_DAMAGE_PERCENT_TAKEN, spellProto ? spellProto->GetSchoolMask() : attacker->GetMeleeDamageSchoolMask());
-
+#ifndef NPCBOT
+    if (GetTypeId() == TYPEID_UNIT && ToCreature()->IsNPCBot())
+        TakenTotalMod *= BotMgr::GetBotDamageTakenMod(ToCreature(), true);
+#endif
     // .. taken pct (special attacks)
     if (spellProto)
     {
@@ -12776,6 +12920,26 @@ void Unit::Mount(uint32 mount, uint32 VehicleId, uint32 creatureEntry)
         SetUInt32Value(UNIT_FIELD_MOUNTDISPLAYID, mount);
 
     SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_MOUNT);
+#ifndef NPCBOT
+    if (GetTypeId() == TYPEID_UNIT && ToCreature()->IsNPCBot())
+    {
+        if (VehicleId)
+        {
+            LOG_ERROR("scripts", "NPCBot::Mount mounting %u, vehicle %u (%u)", mount, VehicleId, creatureEntry);
+            if (CreateVehicleKit(VehicleId, creatureEntry))
+            {
+                // Send others that we now have a vehicle
+                WorldPacket data(SMSG_PLAYER_VEHICLE_DATA, GetPackGUID().size() + 4);
+                data << GetPackGUID();
+                data << uint32(VehicleId);
+                SendMessageToSet(&data, true);
+                GetVehicleKit()->InstallAllAccessories(false);
+            }
+        }
+    }
+    else
+#endif
+
 
     if (Player* player = ToPlayer())
     {
@@ -12849,6 +13013,19 @@ void Unit::Dismount()
     WorldPacket data(SMSG_DISMOUNT, 8);
     data << GetPackGUID();
     SendMessageToSet(&data, true);
+#ifndef NPCBOT
+    if (GetTypeId() == TYPEID_UNIT && ToCreature()->IsNPCBot() && GetVehicleKit())
+    {
+        //TC_LOG_ERROR("scripts", "NPCBot::Dismount dismounting vehicle %u (base %u, cre %u)",
+        //    GetVehicleKit()->GetVehicleInfo()->m_ID, GetVehicleKit()->GetBase()->GetEntry(), GetVehicleKit()->GetCreatureEntry());
+        data.Initialize(SMSG_PLAYER_VEHICLE_DATA, 8 + 4);
+        data << GetPackGUID();
+        data << uint32(0);
+        SendMessageToSetInRange(&data, GetVisibilityRange(), /*not used*/true);
+        RemoveVehicleKit();
+    }
+    else
+#endif
 
     // dismount as a vehicle
     if (GetTypeId() == TYPEID_PLAYER && GetVehicleKit())
@@ -13154,6 +13331,10 @@ bool Unit::IsValidAttackTarget(Unit const* target) const
 bool Unit::_IsValidAttackTarget(Unit const* target, SpellInfo const* bySpell, WorldObject const* obj) const
 {
     ASSERT(target);
+#ifndef NPCBOT
+    if (target && target->IsControlledByPlayer() && target->GetFaction() == 35)
+        return false;
+#endif
 
     // can't attack self
     if (this == target)
@@ -13197,7 +13378,13 @@ bool Unit::_IsValidAttackTarget(Unit const* target, SpellInfo const* bySpell, Wo
             // check if this is a world trigger cast - GOs are using world triggers to cast their spells, so we need to ignore their immunity flag here, this is a temp workaround, needs removal when go cast is implemented properly
             || ((GetEntry() != WORLD_TRIGGER && (!obj || !obj->isType(TYPEMASK_GAMEOBJECT | TYPEMASK_DYNAMICOBJECT))) && target->HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_PLAYER_CONTROLLED) && HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PC)))
         return false;
-
+#ifndef NPCBOT
+    if (obj && target && !HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_PLAYER_CONTROLLED) &&
+        !target->HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_PLAYER_CONTROLLED) &&
+        ((GetTypeId() == TYPEID_UNIT && (ToCreature()->IsNPCBot() || ToCreature()->IsNPCBotPet())) ||
+            (target->GetTypeId() == TYPEID_UNIT && (target->ToCreature()->IsNPCBot() || target->ToCreature()->IsNPCBotPet()))))
+        return GetReactionTo(target) <= REP_NEUTRAL || target->GetReactionTo(this) <= REP_NEUTRAL;
+#endif
     // CvC case - can attack each other only when one of them is hostile
     if (!HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_PLAYER_CONTROLLED) && !target->HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_PLAYER_CONTROLLED))
         return GetReactionTo(target) <= REP_HOSTILE || target->GetReactionTo(this) <= REP_HOSTILE;
@@ -13494,7 +13681,11 @@ bool Unit::IsAlwaysDetectableFor(WorldObject const* seer) const
             if (ownerPlayer->IsGroupVisibleFor(seerPlayer))
                 return true;
         }
-
+#ifndef NPCBOT
+    if (Creature const* bot = ToCreature())
+        if (bot->GetBotAI() && seer->GetGUID() == bot->GetBotOwner()->GetGUID())
+            return true;
+#endif
     return false;
 }
 
@@ -14093,6 +14284,10 @@ float Unit::ApplyEffectModifiers(SpellInfo const* spellProto, uint8 effect_index
                 break;
         }
     }
+#ifndef NPCBOT
+    if (GetTypeId() == TYPEID_UNIT && ToCreature()->IsNPCBot())
+        ToCreature()->ApplyCreatureEffectMods(spellProto, effect_index, value);
+#endif
     return value;
 }
 
@@ -14105,6 +14300,23 @@ int32 Unit::CalculateSpellDamage(Unit const* target, SpellInfo const* spellProto
 int32 Unit::CalcSpellDuration(SpellInfo const* spellProto)
 {
     uint8 comboPoints = GetComboPoints();
+#ifndef NPCBOT
+    if (ToCreature() && ToCreature()->IsNPCBot())
+        comboPoints = ToCreature()->GetCreatureComboPoints();
+    else
+        //npcbot: combo points support for spell duration (vehicle)
+        if (ToCreature() && ToCreature()->IsVehicle() && ToCreature()->GetCharmerGUID().IsCreature() &&
+            spellProto->GetDuration() != spellProto->GetMaxDuration())
+        {
+            Unit const* bot = ToCreature()->GetCharmer();
+            if (bot && bot->ToCreature()->IsNPCBot())
+            {
+                comboPoints = bot->ToCreature()->GetCreatureComboPoints();
+                //TC_LOG_ERROR("scripts", "CalcSpellDuration bot %s veh spell %u cp %u",
+                //    bot->GetName().c_str(), spellProto->Id, uint32(comboPoints));
+            }
+        }
+#endif
 
     int32 minduration = spellProto->GetDuration();
     int32 maxduration = spellProto->GetMaxDuration();
@@ -14231,7 +14443,10 @@ void Unit::ModSpellCastTime(SpellInfo const* spellInfo, int32& castTime, Spell* 
     if (Player* modOwner = GetSpellModOwner())
         // TODO:(MadAgos) Eventually check and delete the bool argument
         modOwner->ApplySpellMod(spellInfo->Id, SPELLMOD_CASTING_TIME, castTime, spell, bool(modOwner != this && !IsPet()));
-
+#ifndef NPCBOT
+    if (castTime > 0 && GetTypeId() == TYPEID_UNIT && ToCreature()->IsNPCBot())
+        ToCreature()->ApplyCreatureSpellCastTimeMods(spellInfo, castTime);
+#endif
     switch (spellInfo->DmgClass)
     {
         case SPELL_DAMAGE_CLASS_NONE:
@@ -14313,6 +14528,11 @@ float Unit::ApplyDiminishingToDuration(DiminishingGroup group, int32& duration, 
                 || target->ToCreature()->GetCreatureTemplate()->flags_extra & CREATURE_FLAG_EXTRA_ALL_DIMINISH)
                 && source->GetTypeId() == TYPEID_PLAYER)
             duration = limitduration;
+#ifndef NPCBOT
+        if (target->GetTypeId() == TYPEID_PLAYER && source->GetTypeId() == TYPEID_UNIT &&
+            source->ToCreature()->IsNPCBotOrPet())
+            duration = limitduration;
+#endif
     }
 
     float mod = 1.0f;
@@ -14424,6 +14644,17 @@ uint32 Unit::GetCreatureType() const
         else
             return CREATURE_TYPE_HUMANOID;
     }
+#ifndef NPCBOT
+    else if (GetTypeId() == TYPEID_UNIT && ToCreature()->IsNPCBot())
+    {
+        ShapeshiftForm form = GetShapeshiftForm();
+        SpellShapeshiftEntry const* ssEntry = sSpellShapeshiftStore.LookupEntry(form);
+        if (ssEntry && ssEntry->creatureType > 0)
+            return ssEntry->creatureType;
+        else
+            return CREATURE_TYPE_HUMANOID;
+    }
+#endif
     else
         return ToCreature()->GetCreatureTemplate()->type;
 }
@@ -15590,6 +15821,14 @@ void Unit::ProcDamageAndSpellFor(bool isVictim, Unit* target, uint32 procFlag, u
                     ModifyAuraState(AURA_STATE_DEFENSE, true);
                     StartReactiveTimer(REACTIVE_DEFENSE);
                 }
+#ifndef NPCBOT
+                if ((procExtra & PROC_HIT_PARRY) && GetTypeId() == TYPEID_UNIT &&
+                    ToCreature()->IsNPCBot() && ToCreature()->GetBotClass() == CLASS_HUNTER)
+                {
+                    ModifyAuraState(AURA_STATE_HUNTER_PARRY, true);
+                    StartReactiveTimer(REACTIVE_HUNTER_PARRY);
+                }
+#endif
             }
             else // For attacker
             {
@@ -15609,6 +15848,16 @@ void Unit::ProcDamageAndSpellFor(bool isVictim, Unit* target, uint32 procFlag, u
                     AddComboPoints(target, 1);
                     StartReactiveTimer(REACTIVE_WOLVERINE_BITE);
                 }
+#ifndef NPCBOT
+                /*
+                if ((procExtra & (PROC_HIT_DODGE | PROC_HIT_PARRY)) && GetTypeId() == TYPEID_UNIT &&
+                ToCreature()->IsNPCBot() && ToCreature()->GetBotClass() == CLASS_WARRIOR)
+                {
+                AddComboPoints(target, 1);  //[bing] AZ creature not have AddComboPoints
+                StartReactiveTimer(REACTIVE_OVERPOWER);
+                }
+                */
+#endif
             }
         }
     }
@@ -18146,6 +18395,16 @@ bool Unit::IsInPartyWith(Unit const* unit) const
     else if ((u2->GetTypeId() == TYPEID_PLAYER && u1->GetTypeId() == TYPEID_UNIT && (u1->ToCreature()->GetCreatureTemplate()->type_flags & CREATURE_TYPE_FLAG_TREAT_AS_RAID_UNIT) && u2->ToPlayer()->GetGroup() && !u2->ToPlayer()->GetGroup()->isRaidGroup()) ||
              (u1->GetTypeId() == TYPEID_PLAYER && u2->GetTypeId() == TYPEID_UNIT && (u2->ToCreature()->GetCreatureTemplate()->type_flags & CREATURE_TYPE_FLAG_TREAT_AS_RAID_UNIT) && u1->ToPlayer()->GetGroup() && !u1->ToPlayer()->GetGroup()->isRaidGroup()))
         return true;
+#ifndef NPCBOT
+    else if (u1->GetTypeId() == TYPEID_PLAYER && u1->ToPlayer()->HaveBot() && u1->ToPlayer()->GetBotMgr()->GetBot(u2->GetGUID()))
+        return true;
+    else if (u2->GetTypeId() == TYPEID_PLAYER && u2->ToPlayer()->HaveBot() && u2->ToPlayer()->GetBotMgr()->GetBot(u1->GetGUID()))
+        return true;
+    else if (u1->GetTypeId() == TYPEID_UNIT && u1->ToCreature()->GetBotAI() && !u1->ToCreature()->IsFreeBot())
+        return u1->ToCreature()->GetBotOwner()->IsInPartyWith(u2);
+    else if (u2->GetTypeId() == TYPEID_UNIT && u2->ToCreature()->GetBotAI() && !u2->ToCreature()->IsFreeBot())
+        return u2->ToCreature()->GetBotOwner()->IsInPartyWith(u1);
+#endif
     else
         return false;
 }
@@ -18168,6 +18427,16 @@ bool Unit::IsInRaidWith(Unit const* unit) const
     else if ((u2->GetTypeId() == TYPEID_PLAYER && u1->GetTypeId() == TYPEID_UNIT && u1->ToCreature()->GetCreatureTemplate()->type_flags & CREATURE_TYPE_FLAG_TREAT_AS_RAID_UNIT) ||
              (u1->GetTypeId() == TYPEID_PLAYER && u2->GetTypeId() == TYPEID_UNIT && u2->ToCreature()->GetCreatureTemplate()->type_flags & CREATURE_TYPE_FLAG_TREAT_AS_RAID_UNIT))
         return true;
+#ifndef NPCBOT
+    else if (u1->GetTypeId() == TYPEID_PLAYER && u1->ToPlayer()->HaveBot() && u1->ToPlayer()->GetBotMgr()->GetBot(u2->GetGUID()))
+        return true;
+    else if (u2->GetTypeId() == TYPEID_PLAYER && u2->ToPlayer()->HaveBot() && u2->ToPlayer()->GetBotMgr()->GetBot(u1->GetGUID()))
+        return true;
+    else if (u1->GetTypeId() == TYPEID_UNIT && u1->ToCreature()->GetBotAI() && !u1->ToCreature()->IsFreeBot())
+        return u1->ToCreature()->GetBotOwner()->IsInRaidWith(u2);
+    else if (u2->GetTypeId() == TYPEID_UNIT && u2->ToCreature()->GetBotAI() && !u2->ToCreature()->IsFreeBot())
+        return u2->ToCreature()->GetBotOwner()->IsInRaidWith(u1);
+#endif
     else
         return false;
 }
@@ -18199,7 +18468,19 @@ void Unit::GetPartyMembers(std::list<Unit*>& TagUnitMap)
                         if (pet->IsGuardian() && pet->IsAlive())
                             TagUnitMap.push_back(pet);
                 }
+#ifndef NPCBOT
+                if (!Target->HaveBot())
+                    continue;
+
+                BotMap const* map = Target->GetBotMgr()->GetBotMap();
+                for (BotMap::const_iterator it = map->begin(); it != map->end(); ++it)
+                {
+                    if (group->GetMemberGroup(it->second->GetGUID()) == subgroup &&
+                        it->second->IsAlive() && IsInMap(it->second) && !IsHostileTo(it->second))
+                        TagUnitMap.push_back(it->second);
+                }
             }
+#endif
         }
     }
     else
@@ -18213,6 +18494,17 @@ void Unit::GetPartyMembers(std::list<Unit*>& TagUnitMap)
                 if (pet->IsGuardian() && pet->IsAlive())
                     TagUnitMap.push_back(pet);
         }
+#ifndef NPCBOT
+        if (owner->GetTypeId() == TYPEID_PLAYER && owner->ToPlayer()->HaveBot())
+        {
+            BotMap const* map = owner->ToPlayer()->GetBotMgr()->GetBotMap();
+            for (BotMap::const_iterator it = map->begin(); it != map->end(); ++it)
+            {
+                if (it->second->IsAlive() && IsInMap(it->second) && !IsHostileTo(it->second))
+                    TagUnitMap.push_back(it->second);
+            }
+        }
+#endif
     }
 }
 
@@ -18351,6 +18643,15 @@ float Unit::MeleeSpellMissChance(Unit const* victim, WeaponAttackType attType, i
 
     //calculate miss chance
     float missChance = victim->GetUnitMissChance(attType);
+#ifndef NPCBOT
+    if (GetTypeId() == TYPEID_UNIT && ToCreature()->IsNPCBot())
+    {
+        if (!ToCreature()->CanMiss())
+            return 0.f;
+
+        missChance += ToCreature()->GetCreatureMissChance();
+    }
+#endif
 
     if (!spellId && haveOffhandWeapon())
         missChance += 19;
@@ -18458,6 +18759,10 @@ void Unit::SetPhaseMask(uint32 newPhaseMask, bool update)
         if (controlled->GetTypeId() == TYPEID_UNIT)
             controlled->SetPhaseMask(newPhaseMask, true);
     }
+#ifndef NPCBOT
+    if (GetTypeId() == TYPEID_PLAYER)
+        ToPlayer()->UpdatePhaseForBots();
+#endif
 
     for (uint8 i = 0; i < MAX_SUMMON_SLOT; ++i)
         if (m_SummonSlot[i])
@@ -18711,7 +19016,185 @@ uint32 Unit::GetModelForForm(ShapeshiftForm form) const
                 break;
         }
     }
-
+#ifndef NPCBOT
+     else if (ToCreature() && ToCreature()->GetBotOwner() && ToCreature()->GetBotOwner()->ToPlayer())
+     {
+     //this has to be modified after implementation of bots' appearances which will include player bytes emulation
+     Player const* player = ToCreature()->GetBotOwner();
+     //let's make druids look according to player but base model must be selected based on our race
+     switch (form)
+     {
+     case FORM_CAT:
+         // Based on master's Hair color
+         if (getRace() == RACE_NIGHTELF)
+         {
+             uint8 hairColor = player->GetByteValue(PLAYER_BYTES, 3);
+             switch (hairColor)
+             {
+             case 7: // Violet
+             case 8:
+                 return 29405;
+             case 3: // Light Blue
+                 return 29406;
+             case 0: // Green
+             case 1: // Light Green
+             case 2: // Dark Green
+                 return 29407;
+             case 4: // White
+                 return 29408;
+             default: // original - Dark Blue
+                 return 892;
+             }
+         }
+         // Based on master's Skin color
+         else if (getRace() == RACE_TAUREN)
+         {
+             uint8 skinColor = player->GetByteValue(PLAYER_BYTES, 0);
+             // Male master
+             if (getGender() == GENDER_MALE)
+             {
+                 switch (skinColor)
+                 {
+                 case 12: // White
+                 case 13:
+                 case 14:
+                 case 18: // Completly White
+                     return 29409;
+                 case 9: // Light Brown
+                 case 10:
+                 case 11:
+                     return 29410;
+                 case 6: // Brown
+                 case 7:
+                 case 8:
+                     return 29411;
+                 case 0: // Dark
+                 case 1:
+                 case 2:
+                 case 3: // Dark Grey
+                 case 4:
+                 case 5:
+                     return 29412;
+                 default: // original - Grey
+                     return 8571;
+                 }
+             }
+             // Female master
+             else switch (skinColor)
+             {
+             case 10: // White
+                 return 29409;
+             case 6: // Light Brown
+             case 7:
+                 return 29410;
+             case 4: // Brown
+             case 5:
+                 return 29411;
+             case 0: // Dark
+             case 1:
+             case 2:
+             case 3:
+                 return 29412;
+             default: // original - Grey
+                 return 8571;
+             }
+         }
+         else if (Player::TeamIdForRace(getRace()) == ALLIANCE)
+             return 892;
+         else
+             return 8571;
+     case FORM_DIREBEAR:
+     case FORM_BEAR:
+         // Based on Hair color
+         if (getRace() == RACE_NIGHTELF)
+         {
+             uint8 hairColor = player->GetByteValue(PLAYER_BYTES, 3);
+             switch (hairColor)
+             {
+             case 0: // Green
+             case 1: // Light Green
+             case 2: // Dark Green
+                 return 29413; // 29415?
+             case 6: // Dark Blue
+                 return 29414;
+             case 4: // White
+                 return 29416;
+             case 3: // Light Blue
+                 return 29417;
+             default: // original - Violet
+                 return 2281;
+             }
+         }
+         // Based on Skin color
+         else if (getRace() == RACE_TAUREN)
+         {
+             uint8 skinColor = player->GetByteValue(PLAYER_BYTES, 0);
+             // Male
+             if (getGender() == GENDER_MALE)
+             {
+                 switch (skinColor)
+                 {
+                 case 0: // Dark (Black)
+                 case 1:
+                 case 2:
+                     return 29418;
+                 case 3: // White
+                 case 4:
+                 case 5:
+                 case 12:
+                 case 13:
+                 case 14:
+                     return 29419;
+                 case 9: // Light Brown/Grey
+                 case 10:
+                 case 11:
+                 case 15:
+                 case 16:
+                 case 17:
+                     return 29420;
+                 case 18: // Completly White
+                     return 29421;
+                 default: // original - Brown
+                     return 2289;
+                 }
+             }
+             // Female
+             else switch (skinColor)
+             {
+             case 0: // Dark (Black)
+             case 1:
+                 return 29418;
+             case 2: // White
+             case 3:
+                 return 29419;
+             case 6: // Light Brown/Grey
+             case 7:
+             case 8:
+             case 9:
+                 return 29420;
+             case 10: // Completly White
+                 return 29421;
+             default: // original - Brown
+                 return 2289;
+             }
+         }
+         else if (Player::TeamIdForRace(getRace()) == ALLIANCE)
+             return 2281;
+         else
+             return 2289;
+     case FORM_FLIGHT:
+         if (Player::TeamIdForRace(getRace()) == ALLIANCE)
+             return 20857;
+         return 20872;
+     case FORM_FLIGHT_EPIC:
+         if (Player::TeamIdForRace(getRace()) == ALLIANCE)
+             return 21243;
+         return 21244;
+     default:
+         break;
+     }
+     }
+#endif
     uint32 modelid = 0;
     SpellShapeshiftEntry const* formEntry = sSpellShapeshiftStore.LookupEntry(form);
     if (formEntry && formEntry->modelID_A)
@@ -19490,6 +19973,18 @@ void Unit::StopAttackFaction(uint32 faction_id)
 
     for (ControlSet::const_iterator itr = m_Controlled.begin(); itr != m_Controlled.end(); ++itr)
         (*itr)->StopAttackFaction(faction_id);
+#ifndef NPCBOT
+    if (GetTypeId() == TYPEID_PLAYER && ToPlayer()->HaveBot())
+    {
+        BotMap const* map = ToPlayer()->GetBotMgr()->GetBotMap();
+        for (BotMap::const_iterator itr = map->begin(); itr != map->end(); ++itr)
+        {
+            itr->second->StopAttackFaction(faction_id);
+            if (Unit* botPet = itr->second->GetBotsPet())
+                botPet->StopAttackFaction(faction_id);
+        }
+    }
+#endif
 }
 
 void Unit::OutDebugInfo() const
@@ -20419,6 +20914,13 @@ void Unit::Whisper(std::string_view text, Language language, Player* target, boo
     ChatHandler::BuildChatPacket(data, isBossWhisper ? CHAT_MSG_RAID_BOSS_WHISPER : CHAT_MSG_MONSTER_WHISPER, language, this, target, text, 0, "", locale);
     target->SendDirectMessage(&data);
 }
+
+#ifndef NPCBOT
+bool Unit::IsNPCBot()
+{
+    return GetTypeId() == TYPEID_UNIT && ToCreature()->IsNPCBot();
+}
+#endif
 
 void Unit::Talk(uint32 textId, ChatMsg msgType, float textRange, WorldObject const* target)
 {

@@ -6,9 +6,7 @@ jobs:
   check-codestyle:
     strategy:
       fail-fast: false
-      matrix:
-        os: [ubuntu-20.04]
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-20.04
     name: check codestyle
     steps:
       - uses: actions/checkout@v2

@@ -42,6 +42,9 @@
 #include "VMapMgr2.h"
 #include "Vehicle.h"
 #include "Weather.h"
+#ifndef NPCBOT
+#include "botmgr.h"
+#endif
 
 union u_map_magic
 {
@@ -2704,7 +2707,26 @@ uint32 Map::GetPlayersCountExceptGMs() const
     uint32 count = 0;
     for (MapRefMgr::const_iterator itr = m_mapRefMgr.begin(); itr != m_mapRefMgr.end(); ++itr)
         if (!itr->GetSource()->IsGameMaster())
-            ++count;
+         #ifndef NPCBOT
+         {
+        if (itr->GetSource()->HaveBot() && BotMgr::LimitBots(this))
+         {
+        ++count;
+        BotMap const* botmap = itr->GetSource()->GetBotMgr()->GetBotMap();
+        for (BotMap::const_iterator itr = botmap->begin(); itr != botmap->end(); ++itr)
+         {
+        Creature * cre = itr->second;
+        if (!cre || !cre->IsInWorld() || cre->FindMap() != this || cre->IsTempBot())
+         continue;
+        ++count;
+        }
+         continue;
+        }
+         ++count;
+        }
+         #else
+         ++count;
+        #endif
     return count;
 }
 

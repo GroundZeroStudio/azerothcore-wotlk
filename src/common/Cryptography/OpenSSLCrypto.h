@@ -15,8 +15,9 @@
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef OPENSSL_CRYPTO_H
-#define OPENSSL_CRYPTO_H
+//#ifndef OPENSSL_CRYPTO_H
+//#define OPENSSL_CRYPTO_H
+#pragma once
 
 #include "Define.h"
 #include <openssl/opensslv.h>
@@ -40,4 +41,4 @@ namespace OpenSSLCrypto
 
 }
 
-#endif
+//#endif

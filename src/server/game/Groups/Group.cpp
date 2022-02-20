@@ -120,6 +120,14 @@ bool Group::Create(Player* leader)
     if (m_groupType & GROUPTYPE_RAID)
         _initRaidSubGroupsCounter();
 
+#ifndef NPCBOT
+	if (leader->HaveBot()) //player + npcbot so set to free-for-all on create
+	{
+		if (!isLFGGroup())
+			m_lootMethod = FREE_FOR_ALL;
+	}
+	else
+#endif
     if (!isLFGGroup())
         m_lootMethod = GROUP_LOOT;
 
@@ -414,6 +422,11 @@ bool Group::AddMember(Player* player)
 
     SubGroupCounterIncrease(subGroup);
 
+#ifndef NPCBOT
+    if (player->GetGUID().IsPlayer())
+    {
+#endif
+
     player->SetGroupInvite(nullptr);
     if (player->GetGroup())
     {
@@ -427,6 +440,10 @@ bool Group::AddMember(Player* player)
 
     // if the same group invites the player back, cancel the homebind timer
     _cancelHomebindIfInstance(player);
+
+#ifndef NPCBOT
+    }
+#endif
 
     if (!isRaidGroup())                                      // reset targetIcons for non-raid-groups
     {
@@ -446,6 +463,11 @@ bool Group::AddMember(Player* player)
     }
 
     SendUpdate();
+
+#ifndef NPCBOT
+    if (!player->GetGUID().IsPlayer())
+        return true;
+#endif
 
     if (player)
     {
@@ -495,24 +517,32 @@ bool Group::AddMember(Player* player)
 
                 if (Player* itrMember = itr->GetSource())
                 {
-                    if (player->HaveAtClient(itrMember))
-                    {
-                        itrMember->SetFieldNotifyFlag(UF_FLAG_PARTY_MEMBER);
-                        itrMember->BuildValuesUpdateBlockForPlayer(&groupData, player);
-                        itrMember->RemoveFieldNotifyFlag(UF_FLAG_PARTY_MEMBER);
-                    }
+                #ifndef NPCBOT
+                if (player->GetGUID().IsPlayer() && player->HaveAtClient(itrMember))
+                #else
+                if (player->HaveAtClient(itrMember))
+                #endif
+                {
+                itrMember->SetFieldNotifyFlag(UF_FLAG_PARTY_MEMBER);
+                itrMember->BuildValuesUpdateBlockForPlayer(&groupData, player);
+                itrMember->RemoveFieldNotifyFlag(UF_FLAG_PARTY_MEMBER);
+                }
 
-                    if (itrMember->HaveAtClient(player))
-                    {
-                        UpdateData newData;
-                        WorldPacket newDataPacket;
-                        player->BuildValuesUpdateBlockForPlayer(&newData, itrMember);
-                        if (newData.HasData())
-                        {
-                            newData.BuildPacket(&newDataPacket);
-                            itrMember->SendDirectMessage(&newDataPacket);
-                        }
-                    }
+                #ifndef NPCBOT
+                if (itrMember->GetGUID().IsPlayer() && itrMember->HaveAtClient(player))
+                #else
+                if (itrMember->HaveAtClient(player))
+                #endif
+                {
+                UpdateData newData;
+                WorldPacket newDataPacket;
+                player->BuildValuesUpdateBlockForPlayer(&newData, itrMember);
+                if (newData.HasData())
+                {
+                newData.BuildPacket(&newDataPacket);
+                itrMember->SendDirectMessage(&newDataPacket);
+                }
+                }
                 }
             }
 
@@ -525,9 +555,14 @@ bool Group::AddMember(Player* player)
             player->RemoveFieldNotifyFlag(UF_FLAG_PARTY_MEMBER);
         }
 
-        if (m_maxEnchantingLevel < player->GetSkillValue(SKILL_ENCHANTING))
-            m_maxEnchantingLevel = player->GetSkillValue(SKILL_ENCHANTING);
-    }
+                #ifndef NPCBOT
+                if (player->GetGUID().IsPlayer() && m_maxEnchantingLevel < player->GetSkillValue(SKILL_ENCHANTING))
+                m_maxEnchantingLevel = player->GetSkillValue(SKILL_ENCHANTING);
+                #else
+                if (m_maxEnchantingLevel < player->GetSkillValue(SKILL_ENCHANTING))
+                m_maxEnchantingLevel = player->GetSkillValue(SKILL_ENCHANTING);
+                #endif
+                }
 
     return true;
 }
@@ -542,7 +577,44 @@ bool Group::RemoveMember(ObjectGuid guid, const RemoveMethod& method /*= GROUP_R
         sLFGMgr->InitBoot(GetGUID(), kicker, guid, std::string(reason ? reason : ""));
         return m_memberSlots.size() > 0;
     }
+#ifndef NPCBOT
+	if (!guid.IsPlayer())
+	{
+		// Remove bot from group in DB
+		if (!isBGGroup() && !isBFGroup())
+		{
+			CharacterDatabasePreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_GROUP_MEMBER);
+			stmt->SetData(0, guid.GetCounter());
+			CharacterDatabase.Execute(stmt);
+			//DelinkMember(guid);
 
+		}
+		// Update subgroup
+		member_witerator slot = _getMemberWSlot(guid);
+		if (slot != m_memberSlots.end())
+		{
+			SubGroupCounterDecrease(slot->group);
+			m_memberSlots.erase(slot);
+		}
+
+		SendUpdate();
+
+		// do not disband raid group if bot owner logging out within dungeon
+		// 1-player raid groups will not happen unless player is gm - bots will rejoin at login
+		if (GetMembersCount() < 2 && isRaidGroup() && GetLeaderGUID())
+		{
+			Player* player = ObjectAccessor::FindPlayer(GetLeaderGUID());
+			Map* map = player ? player->FindMap() : nullptr;
+			if (!(map && map->IsDungeon() && player && player->GetSession()->PlayerLogout()))
+				Disband();
+		}
+		else if (GetMembersCount() < 2 && !(isLFGGroup() || isBGGroup() || isBFGroup()))
+			Disband();
+
+		return true;
+	}
+	else
+#endif
     // remove member and change leader (if need) only if strong more 2 members _before_ member remove (BG/BF allow 1 member group)
     if (GetMembersCount() > ((isBGGroup() || isLFGGroup() || isBFGroup()) ? 1u : 2u))
     {
@@ -682,6 +754,9 @@ bool Group::RemoveMember(ObjectGuid guid, const RemoveMethod& method /*= GROUP_R
         }
 
         if (m_memberMgr.getSize() < ((isLFGGroup() || isBGGroup() || isBFGroup()) ? 1u : 2u))
+#ifndef NPCBOT
+        if (GetMembersCount() < ((isLFGGroup() || isBGGroup()) ? 1u : 2u))
+#endif
         {
             Disband();
             return false;
