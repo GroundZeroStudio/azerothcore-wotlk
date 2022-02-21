@@ -707,27 +707,15 @@ void BotMgr::_teleportBot(Creature* bot, Map* newMap, float x, float y, float z,
     {
         bot->BotStopMovement();
         bot->GetBotAI()->UnsummonAll();
-
-        ////start Unit::CleanupBeforeRemoveFromMap()
         bot->InterruptNonMeleeSpells(true);
-        //bot->IsAIEnabled = false;
-        if (bot->IsInWorld())
-            bot->RemoveFromWorld();
-
         ASSERT(bot->GetGUID());
-
-        //RemoveAllAuras();
         bot->RemoveAllGameObjects();
-
         bot->m_Events.KillAllEvents(false);                      // non-delatable (currently casted spells) will not deleted now but it will deleted at call in Map::RemoveAllObjectsInRemoveList
         bot->CombatStop();
         bot->ClearComboPoints();
         bot->ClearComboPointHolders();
-        //bot->DeleteThreatList();
-        //bot->getHostileRefManager().setOnlineOfflineState(false);
-
-        //bot->CleanupBeforeRemoveFromMap(false);
-
+        bot->DeleteThreatList();
+        bot->getHostileRefMgr().deleteReferences();
         mymap->RemoveFromMap(bot, false);
     }
 
