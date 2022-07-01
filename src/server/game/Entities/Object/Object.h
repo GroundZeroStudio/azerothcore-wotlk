@@ -499,7 +499,7 @@ public:
 
     virtual void SetMap(Map* map);
     virtual void ResetMap();
-    [[nodiscard]] Map* GetMap() const { ASSERT(m_currMap); return m_currMap; }
+    [[nodiscard]] Map* GetMap() const { return m_currMap; }
     [[nodiscard]] Map* FindMap() const { return m_currMap; }
     //used to check all object's GetMap() calls when object is not in world!
 
