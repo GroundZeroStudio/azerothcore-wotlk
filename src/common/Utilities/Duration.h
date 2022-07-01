@@ -52,16 +52,20 @@ using Months = std::chrono::duration<__INT64_TYPE__, std::ratio<2629746>>;
 #else
 
 /// Days shorthand typedef.
-using Days = std::chrono::days;
+//using Days = std::chrono::days;
+using Days = std::chrono::duration<int, std::ratio<86400>>;
 
 /// Weeks shorthand typedef.
-using Weeks = std::chrono::weeks;
+//using Weeks = std::chrono::weeks;
+using Weeks = std::chrono::duration<int, std::ratio<604800>>;
 
 /// Years shorthand typedef.
-using Years = std::chrono::years;
+//using Years = std::chrono::years;
+using Years = std::chrono::duration<int, std::ratio<31536000>>;
 
 /// Months shorthand typedef.
-using Months = std::chrono::months;
+//using Months = std::chrono::months;
+using Months = std::chrono::duration<int, std::ratio<259200>>;
 
 #endif // GCC_VERSION
 
