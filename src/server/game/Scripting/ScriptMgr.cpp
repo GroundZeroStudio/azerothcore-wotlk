@@ -21,6 +21,7 @@
 #include "SmartAI.h"
 #include "SpellMgr.h"
 #include "UnitAI.h"
+#include "botmgr.h"
 
 namespace
 {
@@ -68,6 +69,8 @@ void ScriptMgr::Initialize()
 
     ASSERT(_modules_loader_callback,
         "Modules loader callback wasn't registered!");
+
+    AddNpcBotScripts();
 
     _script_loader_callback();
     _modules_loader_callback();
