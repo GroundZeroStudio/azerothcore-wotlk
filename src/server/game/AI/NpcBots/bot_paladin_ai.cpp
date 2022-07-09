@@ -1087,40 +1087,21 @@ public:
             Unit const* victim = me->GetVictim();
 
             uint32 COMMAND = GetSpell(SEAL_OF_COMMAND_1);
-            uint32 LIGHT = GetSpell(SEAL_OF_LIGHT_1);
             uint32 RIGHT = GetSpell(SEAL_OF_RIGHTEOUSNESS_1);
             uint32 WISDOM = GetSpell(SEAL_OF_WISDOM_1);
-            uint32 JUSTICE = GetSpell(SEAL_OF_JUSTICE_1);
-            uint32 VENGEANCE = (me->getRaceMask() & RACEMASK_ALLIANCE) ? GetSpell(SEAL_OF_VENGEANCE_1) : GetSpell(SEAL_OF_CORRUPTION_1);
-
-            if (VENGEANCE && victim &&
-                (victim->GetMaxHealth() > me->GetMaxHealth() * (2 + victim->getAttackers().size() / 2) ||
-                victim->getClass() == CLASS_ROGUE))
-                COMMAND = VENGEANCE;
 
             uint32 SEAL = 0;
 
-            if (IsMelee() && GetManaPCT(me) < 20 && WISDOM)
-                SEAL = WISDOM;
-            else if (IsTank())
+            if (IsTank())
             {
-                if (JUSTICE && me->getAttackers().size() > 1)
-                    JUSTICE = 0;
-                if (JUSTICE && victim)
-                {
-                    Creature const* cre = victim->ToCreature();
-                    if (cre && cre->GetCreatureTemplate()->rank != CREATURE_ELITE_NORMAL &&
-                        (cre->GetCreatureTemplate()->MechanicImmuneMask & (1<<(MECHANIC_STUN-1))))
-                        JUSTICE = 0;
-                }
-                SEAL = COMMAND ? COMMAND : JUSTICE ? JUSTICE : RIGHT;
+                SEAL = RIGHT;
             }
             else if (HasRole(BOT_ROLE_DPS))
             {
-                SEAL = WISDOM && HasRole(BOT_ROLE_HEAL) ? WISDOM : COMMAND ? COMMAND : RIGHT;
+                SEAL = COMMAND ? COMMAND : RIGHT;
             }
             else if (HasRole(BOT_ROLE_HEAL))
-                SEAL = WISDOM ? WISDOM : LIGHT ? LIGHT : RIGHT;
+                SEAL = WISDOM ? WISDOM : RIGHT;
 
             if (SEAL && !me->HasAura(SEAL))
                 if (doCast(me, SEAL))
@@ -1247,9 +1228,12 @@ public:
 
             if (IsTank(target))
             {
+                if (target->getClass() == BOT_CLASS_PALADIN)
+                {
+                    if (BLESSING_OF_SANCTUARY && !sanctuary && doCast(target, BLESSING_OF_SANCTUARY))
+                        return true;
+                }
                 if (BLESSING_OF_KINGS && !kings && doCast(target, BLESSING_OF_KINGS))
-                    return true;
-                else if (BLESSING_OF_SANCTUARY && !sanctuary && doCast(target, BLESSING_OF_SANCTUARY))
                     return true;
                 else if (BLESSING_OF_WISDOM && !wisdom && target->GetMaxPower(POWER_MANA) > 1 && doCast(target, BLESSING_OF_WISDOM))
                     return true;
