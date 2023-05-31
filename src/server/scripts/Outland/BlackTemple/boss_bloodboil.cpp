@@ -92,9 +92,9 @@ public:
             BossAI::Reset();
         }
 
-        void EnterCombat(Unit* who) override
+        void JustEngagedWith(Unit* who) override
         {
-            BossAI::EnterCombat(who);
+            BossAI::JustEngagedWith(who);
             Talk(SAY_AGGRO);
 
             me->CastSpell(me, SPELL_ACIDIC_WOUND, true);
@@ -188,7 +188,6 @@ public:
             }
 
             DoMeleeAttackIfReady();
-            EnterEvadeIfOutOfCombatArea();
         }
 
         bool CheckEvadeIfOutOfCombatArea() const override
@@ -246,7 +245,7 @@ public:
         {
             PreventHitEffect(effIndex);
             if (Unit* target = GetHitUnit())
-                GetCaster()->getThreatMgr().modifyThreatPercent(target, -20);
+                GetCaster()->GetThreatMgr().ModifyThreatByPercent(target, -20);
         }
 
         void Register() override

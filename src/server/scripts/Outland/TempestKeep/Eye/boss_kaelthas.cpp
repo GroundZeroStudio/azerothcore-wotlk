@@ -200,7 +200,7 @@ public:
                 {
                     advisor->Respawn(true);
                     advisor->StopMovingOnCurrentPos();
-                    advisor->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
+                    advisor->SetUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
                     advisor->SetReactState(REACT_PASSIVE);
                     summons.Summon(advisor);
                 }
@@ -216,7 +216,7 @@ public:
                         {
                             summon->SetReactState(REACT_PASSIVE);
                             summon->setDeathState(JUST_RESPAWNED);
-                            summon->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
+                            summon->SetUnitFlag(UNIT_FLAG_NOT_SELECTABLE);
                         }
             }
         }
@@ -239,8 +239,8 @@ public:
             phase = PHASE_NONE;
 
             me->ApplySpellImmune(0, IMMUNITY_STATE, SPELL_AURA_HOVER, true);
-            me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
-            me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_DISABLE_MOVE);
+            me->RemoveUnitFlag(UNIT_FLAG_NOT_SELECTABLE);
+            me->SetUnitFlag(UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_DISABLE_MOVE);
             SetRoomState(GO_STATE_READY);
             me->SetDisableGravity(false);
             me->SetWalk(false);
@@ -264,9 +264,9 @@ public:
             }
         }
 
-        void EnterCombat(Unit* who) override
+        void JustEngagedWith(Unit* who) override
         {
-            BossAI::EnterCombat(who);
+            BossAI::JustEngagedWith(who);
         }
 
         void KilledUnit(Unit* victim) override
@@ -322,7 +322,7 @@ public:
 
         void JustDied(Unit* killer) override
         {
-            me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_NOT_SELECTABLE);
+            me->RemoveUnitFlag(UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_NOT_SELECTABLE);
 
             Talk(SAY_DEATH);
             BossAI::JustDied(killer);
@@ -358,7 +358,7 @@ public:
                 me->SetWalk(false);
                 me->RemoveAurasDueToSpell(SPELL_KAEL_FULL_POWER);
                 me->SetReactState(REACT_AGGRESSIVE);
-                me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE | UNIT_FLAG_NON_ATTACKABLE);
+                me->RemoveUnitFlag(UNIT_FLAG_NOT_SELECTABLE | UNIT_FLAG_NON_ATTACKABLE);
                 events.SetTimer(60000);
                 events.ScheduleEvent(EVENT_SPELL_FIREBALL, 0);
                 events.ScheduleEvent(EVENT_SPELL_FLAMESTRIKE, 10000);
@@ -374,9 +374,6 @@ public:
 
         void UpdateAI(uint32 diff) override
         {
-            if (EnterEvadeIfOutOfCombatArea())
-                return;
-
             events2.Update(diff);
             switch (events2.ExecuteEvent())
             {
@@ -390,7 +387,7 @@ public:
                     if (Creature* advisor = summons.GetCreatureWithEntry(NPC_THALADRED))
                     {
                         advisor->SetReactState(REACT_AGGRESSIVE);
-                        advisor->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
+                        advisor->RemoveUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
                         if (Unit* target = SelectTarget(SelectTargetMethod::Random, 0))
                             advisor->AI()->AttackStart(target);
                         advisor->SetInCombatWithZone();
@@ -404,7 +401,7 @@ public:
                     if (Creature* advisor = summons.GetCreatureWithEntry(NPC_LORD_SANGUINAR))
                     {
                         advisor->SetReactState(REACT_AGGRESSIVE);
-                        advisor->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
+                        advisor->RemoveUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
                         if (Unit* target = SelectTarget(SelectTargetMethod::Random, 0))
                             advisor->AI()->AttackStart(target);
                         advisor->SetInCombatWithZone();
@@ -418,7 +415,7 @@ public:
                     if (Creature* advisor = summons.GetCreatureWithEntry(NPC_CAPERNIAN))
                     {
                         advisor->SetReactState(REACT_AGGRESSIVE);
-                        advisor->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
+                        advisor->RemoveUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
                         if (Unit* target = SelectTarget(SelectTargetMethod::Random, 0))
                             advisor->AI()->AttackStart(target);
                         advisor->SetInCombatWithZone();
@@ -432,7 +429,7 @@ public:
                     if (Creature* advisor = summons.GetCreatureWithEntry(NPC_TELONICUS))
                     {
                         advisor->SetReactState(REACT_AGGRESSIVE);
-                        advisor->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
+                        advisor->RemoveUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
                         if (Unit* target = SelectTarget(SelectTargetMethod::Random, 0))
                             advisor->AI()->AttackStart(target);
                         advisor->SetInCombatWithZone();
@@ -450,7 +447,7 @@ public:
                         if (Creature* summon = ObjectAccessor::GetCreature(*me, *i))
                             if (!summon->GetSpawnId())
                             {
-                                summon->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE | UNIT_FLAG_NON_ATTACKABLE);
+                                summon->RemoveUnitFlag(UNIT_FLAG_NOT_SELECTABLE | UNIT_FLAG_NON_ATTACKABLE);
                                 summon->SetInCombatWithZone();
                                 if (Unit* target = SelectTarget(SelectTargetMethod::Random, 0))
                                     summon->AI()->AttackStart(target);
@@ -473,7 +470,7 @@ public:
                             if (summon->GetSpawnId())
                             {
                                 summon->SetReactState(REACT_AGGRESSIVE);
-                                summon->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
+                                summon->RemoveUnitFlag(UNIT_FLAG_NOT_SELECTABLE);
                                 summon->SetInCombatWithZone();
                                 if (Unit* target = SelectTarget(SelectTargetMethod::Random, 0))
                                     summon->AI()->AttackStart(target);
@@ -484,8 +481,8 @@ public:
                     events2.CancelEvent(EVENT_PREFIGHT_PHASE71);
                     Talk(SAY_PHASE4_INTRO2);
                     phase = PHASE_FINAL;
-                    DoResetThreat();
-                    me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_DISABLE_MOVE);
+                    DoResetThreatList();
+                    me->RemoveUnitFlag(UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_DISABLE_MOVE);
                     if (Unit* target = SelectTarget(SelectTargetMethod::Random, 0))
                         AttackStart(target);
 
@@ -670,7 +667,7 @@ public:
                     if (me->HealthBelowPct(51))
                     {
                         events.Reset();
-                        me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
+                        me->SetUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
                         me->SetReactState(REACT_PASSIVE);
                         me->GetMotionMaster()->MovePoint(POINT_MIDDLE, me->GetHomePosition(), true, true);
                         me->ClearUnitState(UNIT_STATE_MELEE_ATTACKING);
@@ -998,7 +995,7 @@ public:
         {
             PreventHitEffect(effIndex);
 
-            ThreatContainer::StorageType const& ThreatList = GetCaster()-> getThreatMgr().getThreatList();
+            ThreatContainer::StorageType const& ThreatList = GetCaster()-> GetThreatMgr().GetThreatList();
             std::list<Unit*> targetList;
             for (ThreatContainer::StorageType::const_iterator itr = ThreatList.begin(); itr != ThreatList.end(); ++itr)
             {

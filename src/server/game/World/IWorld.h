@@ -24,15 +24,17 @@
 #include "ObjectGuid.h"
 #include "QueryResult.h"
 #include "SharedDefines.h"
+#include "Unit.h"
 #include <atomic>
 #include <list>
 #include <map>
 #include <set>
 #include <unordered_map>
 
+class IWorld;
+class Player;
 class WorldPacket;
 class WorldSession;
-class Player;
 
 /// Storage class for commands issued for delayed execution
 struct AC_GAME_API CliCommandHolder
@@ -138,8 +140,8 @@ enum WorldBoolConfigs
     CONFIG_AUTOBROADCAST,
     CONFIG_ALLOW_TICKETS,
     CONFIG_DELETE_CHARACTER_TICKET_TRACE,
+    CONFIG_DBC_ENFORCE_ITEM_ATTRIBUTES,
     CONFIG_PRESERVE_CUSTOM_CHANNELS,
-    CONFIG_WINTERGRASP_ENABLE,
     CONFIG_PDUMP_NO_PATHS,
     CONFIG_PDUMP_NO_OVERWRITE,
     CONFIG_ENABLE_MMAPS, // pussywizard
@@ -173,6 +175,16 @@ enum WorldBoolConfigs
     CONFIG_REALM_LOGIN_ENABLED,
     CONFIG_PLAYER_SETTINGS_ENABLED,
     CONFIG_ALLOW_JOIN_BG_AND_LFG,
+    CONFIG_MISS_CHANCE_MULTIPLIER_ONLY_FOR_PLAYERS,
+    CONFIG_LEAVE_GROUP_ON_LOGOUT,
+    CONFIG_QUEST_POI_ENABLED,
+    CONFIG_VMAP_BLIZZLIKE_PVP_LOS,
+    CONFIG_OBJECT_SPARKLES,
+    CONFIG_LOW_LEVEL_REGEN_BOOST,
+    CONFIG_OBJECT_QUEST_MARKERS,
+    CONFIG_STRICT_NAMES_RESERVED,
+    CONFIG_STRICT_NAMES_PROFANITY,
+    CONFIG_ALLOWS_RANK_MOD_FOR_PET_HEALTH,
     BOOL_CONFIG_VALUE_COUNT
 };
 
@@ -227,6 +239,7 @@ enum WorldIntConfigs
     CONFIG_START_PLAYER_LEVEL,
     CONFIG_START_HEROIC_PLAYER_LEVEL,
     CONFIG_START_PLAYER_MONEY,
+    CONFIG_START_HEROIC_PLAYER_MONEY,
     CONFIG_MAX_HONOR_POINTS,
     CONFIG_MAX_HONOR_POINTS_MONEY_PER_POINT,
     CONFIG_START_HONOR_POINTS,
@@ -264,6 +277,8 @@ enum WorldIntConfigs
     CONFIG_EXPANSION,
     CONFIG_CHATFLOOD_MESSAGE_COUNT,
     CONFIG_CHATFLOOD_MESSAGE_DELAY,
+    CONFIG_CHATFLOOD_ADDON_MESSAGE_COUNT,
+    CONFIG_CHATFLOOD_ADDON_MESSAGE_DELAY,
     CONFIG_CHATFLOOD_MUTE_TIME,
     CONFIG_EVENT_ANNOUNCE,
     CONFIG_CREATURE_FAMILY_ASSISTANCE_DELAY,
@@ -304,8 +319,10 @@ enum WorldIntConfigs
     CONFIG_BATTLEGROUND_SPEED_BUFF_RESPAWN,
     CONFIG_BATTLEGROUND_QUEUE_ANNOUNCER_LIMIT_MIN_LEVEL,
     CONFIG_BATTLEGROUND_QUEUE_ANNOUNCER_LIMIT_MIN_PLAYERS,
+    CONFIG_WINTERGRASP_ENABLE,
     CONFIG_ARENA_MAX_RATING_DIFFERENCE,
     CONFIG_ARENA_RATING_DISCARD_TIMER,
+    CONFIG_ARENA_PREV_OPPONENTS_DISCARD_TIMER,
     CONFIG_ARENA_AUTO_DISTRIBUTE_INTERVAL_DAYS,
     CONFIG_ARENA_GAMES_REQUIRED,
     CONFIG_ARENA_SEASON_ID,
@@ -396,6 +413,8 @@ enum WorldIntConfigs
     CONFIG_LOOT_NEED_BEFORE_GREED_ILVL_RESTRICTION,
     CONFIG_LFG_MAX_KICK_COUNT,
     CONFIG_LFG_KICK_PREVENTION_TIMER,
+    CONFIG_CHANGE_FACTION_MAX_MONEY,
+    CONFIG_WATER_BREATH_TIMER,
     INT_CONFIG_VALUE_COUNT
 };
 
@@ -440,7 +459,12 @@ enum Rates
     RATE_DROP_MONEY,
     RATE_REWARD_BONUS_MONEY,
     RATE_XP_KILL,
-    RATE_XP_BG_KILL,
+    RATE_XP_BG_KILL_AV,
+    RATE_XP_BG_KILL_WSG,
+    RATE_XP_BG_KILL_AB,
+    RATE_XP_BG_KILL_EOTS,
+    RATE_XP_BG_KILL_SOTA,
+    RATE_XP_BG_KILL_IC,
     RATE_XP_QUEST,
     RATE_XP_QUEST_DF,
     RATE_XP_EXPLORE,
@@ -494,12 +518,14 @@ enum Rates
 class IWorld
 {
 public:
+    std::list<DelayedDamage> _delayedDamages;
+
     virtual ~IWorld() = default;
     [[nodiscard]] virtual WorldSession* FindSession(uint32 id) const = 0;
     [[nodiscard]] virtual WorldSession* FindOfflineSession(uint32 id) const = 0;
     [[nodiscard]] virtual WorldSession* FindOfflineSessionForCharacterGUID(ObjectGuid::LowType guidLow) const = 0;
+    virtual void AddDelayedDamage(Unit* attacker, Unit* victim, uint32 damage, CleanDamage const* cleanDamage, DamageEffectType damagetype, SpellSchoolMask damageSchoolMask, SpellInfo const* spellProto, bool durabilityLoss);
     virtual void AddSession(WorldSession* s) = 0;
-    virtual void SendAutoBroadcast() = 0;
     virtual bool KickSession(uint32 id) = 0;
     virtual void UpdateMaxSessionCounters() = 0;
     [[nodiscard]] virtual const SessionMap& GetAllSessions() const = 0;
@@ -574,12 +600,8 @@ public:
     virtual void UpdateRealmCharCount(uint32 accid) = 0;
     [[nodiscard]] virtual LocaleConstant GetAvailableDbcLocale(LocaleConstant locale) const = 0;
     virtual void LoadDBVersion() = 0;
-    virtual void LoadDBRevision() = 0;
     [[nodiscard]] virtual char const* GetDBVersion() const = 0;
-    [[nodiscard]] virtual char const* GetWorldDBRevision() const = 0;
-    [[nodiscard]] virtual char const* GetCharacterDBRevision() const = 0;
-    [[nodiscard]] virtual char const* GetAuthDBRevision() const = 0;
-    virtual void LoadAutobroadcasts() = 0;
+    virtual void LoadMotd() = 0;
     virtual void UpdateAreaDependentAuras() = 0;
     [[nodiscard]] virtual uint32 GetCleaningFlags() const = 0;
     virtual void   SetCleaningFlags(uint32 flags) = 0;

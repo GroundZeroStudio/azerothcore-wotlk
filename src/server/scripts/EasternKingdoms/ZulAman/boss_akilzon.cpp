@@ -110,7 +110,7 @@ public:
             SetWeather(WEATHER_STATE_FINE, 0.0f);
         }
 
-        void EnterCombat(Unit* /*who*/) override
+        void JustEngagedWith(Unit* /*who*/) override
         {
             events.ScheduleEvent(EVENT_STATIC_DISRUPTION, urand(10000, 20000)); // 10 to 20 seconds (bosskillers)
             events.ScheduleEvent(EVENT_GUST_OF_WIND, urand(20000, 30000));      // 20 to 30 seconds(bosskillers)
@@ -189,7 +189,7 @@ public:
                         trigger->SetFaction(FACTION_FRIENDLY);
                         trigger->SetMaxHealth(100000);
                         trigger->SetHealth(100000);
-                        trigger->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
+                        trigger->RemoveUnitFlag(UNIT_FLAG_NOT_SELECTABLE);
                         if (Cloud)
                             Cloud->CastCustomSpell(trigger, /*43661*/SPELL_ZAP, &bp0, nullptr, nullptr, true, 0, 0, Cloud->GetGUID());
                     }
@@ -284,7 +284,7 @@ public:
                                 Cloud->SetFaction(FACTION_FRIENDLY);
                                 Cloud->SetMaxHealth(9999999);
                                 Cloud->SetHealth(9999999);
-                                Cloud->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
+                                Cloud->RemoveUnitFlag(UNIT_FLAG_NOT_SELECTABLE);
                             }
                             StormCount = 1;
                             events.ScheduleEvent(EVENT_ELECTRICAL_STORM, 60000); // 60 seconds(bosskillers)
@@ -391,7 +391,7 @@ public:
             me->SetDisableGravity(true);
         }
 
-        void EnterCombat(Unit* /*who*/) override
+        void JustEngagedWith(Unit* /*who*/) override
         {
             DoZoneInCombat();
         }

@@ -18,6 +18,7 @@
 #include "Group.h"
 #include "Battleground.h"
 #include "BattlegroundMgr.h"
+#include "Config.h"
 #include "DatabaseEnv.h"
 #include "GameTime.h"
 #include "GroupMgr.h"
@@ -112,7 +113,7 @@ bool Group::Create(Player* leader)
     m_guid = ObjectGuid::Create<HighGuid::Group>(lowguid);
     m_leaderGuid = leaderGuid;
     m_leaderName = leader->GetName();
-    leader->SetFlag(PLAYER_FLAGS, PLAYER_FLAGS_GROUP_LEADER);
+    leader->SetPlayerFlag(PLAYER_FLAGS_GROUP_LEADER);
 
     if (isBGGroup() || isBFGroup())
         m_groupType = GROUPTYPE_BGRAID;
@@ -284,6 +285,16 @@ void Group::ConvertToLFG(bool restricted /*= true*/)
     }
 
     SendUpdate();
+}
+
+bool Group::CheckLevelForRaid()
+{
+    for (member_citerator citr = m_memberSlots.begin(); citr != m_memberSlots.end(); ++citr)
+        if (Player* player = ObjectAccessor::FindPlayer(citr->guid))
+            if (player->GetLevel() < sConfigMgr->GetOption<int32>("Group.Raid.LevelRestriction", 10))
+                return true;
+
+    return false;
 }
 
 void Group::ConvertToRaid()
@@ -800,9 +811,9 @@ void Group::ChangeLeader(ObjectGuid newLeaderGuid)
     }
 
     if (Player* oldLeader = ObjectAccessor::FindConnectedPlayer(m_leaderGuid))
-        oldLeader->RemoveFlag(PLAYER_FLAGS, PLAYER_FLAGS_GROUP_LEADER);
+        oldLeader->RemovePlayerFlag(PLAYER_FLAGS_GROUP_LEADER);
 
-    newLeader->SetFlag(PLAYER_FLAGS, PLAYER_FLAGS_GROUP_LEADER);
+    newLeader->SetPlayerFlag(PLAYER_FLAGS_GROUP_LEADER);
     m_leaderGuid = newLeader->GetGUID();
     m_leaderName = newLeader->GetName();
     ToggleGroupMemberFlag(slot, MEMBER_FLAG_ASSISTANT, false);
@@ -819,6 +830,8 @@ void Group::Disband(bool hideDestroy /* = false */)
     sScriptMgr->OnGroupDisband(this);
 
     Player* player;
+    uint32 instanceId = 0;
+
     for (member_citerator citr = m_memberSlots.begin(); citr != m_memberSlots.end(); ++citr)
     {
         if (!isBGGroup() && !isBFGroup())
@@ -827,6 +840,11 @@ void Group::Disband(bool hideDestroy /* = false */)
         }
 
         player = ObjectAccessor::FindConnectedPlayer(citr->guid);
+
+        if (player && !instanceId && !isBGGroup() && !isBFGroup())
+        {
+            instanceId = player->GetInstanceId();
+        }
 
         _homebindIfInstance(player);
         if (!isBGGroup() && !isBFGroup())
@@ -895,6 +913,9 @@ void Group::Disband(bool hideDestroy /* = false */)
         stmt->SetData(0, GetGUID().GetCounter());
         CharacterDatabase.Execute(stmt);
     }
+
+    // Cleaning up instance saved data for gameobjects when a group is disbanded
+    sInstanceSaveMgr->DeleteInstanceSavedData(instanceId);
 
     sGroupMgr->RemoveGroup(this);
     delete this;
@@ -1069,7 +1090,7 @@ void Group::GroupLoot(Loot* loot, WorldObject* pLootedObject)
                     continue;
                 if (member->IsAtLootRewardDistance(pLootedObject))
                 {
-                    if (i->AllowedForPlayer(member))
+                    if (i->AllowedForPlayer(member, loot->sourceWorldObjectGUID))
                     {
                         r->totalPlayersRolling++;
 
@@ -1153,7 +1174,7 @@ void Group::GroupLoot(Loot* loot, WorldObject* pLootedObject)
 
             if (member->IsAtLootRewardDistance(pLootedObject))
             {
-                if (i->AllowedForPlayer(member))
+                if (i->AllowedForPlayer(member, loot->sourceWorldObjectGUID))
                 {
                     r->totalPlayersRolling++;
                     r->playerVote[member->GetGUID()] = NOT_EMITED_YET;
@@ -1211,7 +1232,7 @@ void Group::NeedBeforeGreed(Loot* loot, WorldObject* lootedObject)
                 if (!playerToRoll)
                     continue;
 
-                if (i->AllowedForPlayer(playerToRoll) && playerToRoll->IsAtLootRewardDistance(lootedObject))
+                if (i->AllowedForPlayer(playerToRoll, loot->sourceWorldObjectGUID) && playerToRoll->IsAtLootRewardDistance(lootedObject))
                 {
                     r->totalPlayersRolling++;
                     if (playerToRoll->GetPassOnGroupLoot())
@@ -1285,7 +1306,7 @@ void Group::NeedBeforeGreed(Loot* loot, WorldObject* lootedObject)
             if (!playerToRoll)
                 continue;
 
-            if (i->AllowedForPlayer(playerToRoll) && playerToRoll->IsAtLootRewardDistance(lootedObject))
+            if (i->AllowedForPlayer(playerToRoll, loot->sourceWorldObjectGUID) && playerToRoll->IsAtLootRewardDistance(lootedObject))
             {
                 r->totalPlayersRolling++;
                 r->playerVote[playerToRoll->GetGUID()] = NOT_EMITED_YET;
@@ -1502,7 +1523,9 @@ void Group::CountTheRoll(Rolls::iterator rollI, Map* allowedMap)
                         roll->getLoot()->NotifyItemRemoved(roll->itemSlot);
                         roll->getLoot()->unlootedCount--;
                         AllowedLooterSet looters = item->GetAllowedLooters();
-                        player->StoreNewItem(dest, roll->itemid, true, item->randomPropertyId, looters);
+                        Item* _item = player->StoreNewItem(dest, roll->itemid, true, item->randomPropertyId, looters);
+                        if (_item)
+                            sScriptMgr->OnGroupRollRewardItem(player, _item, _item->GetCount(), NEED, roll);
                         player->UpdateLootAchievements(item, roll->getLoot());
                     }
                     else
@@ -1570,7 +1593,9 @@ void Group::CountTheRoll(Rolls::iterator rollI, Map* allowedMap)
                             roll->getLoot()->NotifyItemRemoved(roll->itemSlot);
                             roll->getLoot()->unlootedCount--;
                             AllowedLooterSet looters = item->GetAllowedLooters();
-                            player->StoreNewItem(dest, roll->itemid, true, item->randomPropertyId, looters);
+                            Item* _item = player->StoreNewItem(dest, roll->itemid, true, item->randomPropertyId, looters);
+                            if (_item)
+                                sScriptMgr->OnGroupRollRewardItem(player, _item, _item->GetCount(), GREED, roll);
                             player->UpdateLootAchievements(item, roll->getLoot());
                         }
                         else
@@ -1764,10 +1789,9 @@ void Group::UpdatePlayerOutOfRange(Player* player)
     WorldPacket data;
     player->GetSession()->BuildPartyMemberStatsChangedPacket(player, &data);
 
-    Player* member;
     for (GroupReference* itr = GetFirstMember(); itr != nullptr; itr = itr->next())
     {
-        member = itr->GetSource();
+        Player* member = itr->GetSource();
         if (member && (!member->IsInMap(player) || !member->IsWithinDist(player, member->GetSightRange(player), false)))
             member->GetSession()->SendPacket(&data);
     }
@@ -1946,7 +1970,7 @@ void Group::UpdateLooterGuid(WorldObject* pLootedObject, bool ifneed)
     }
 }
 
-GroupJoinBattlegroundResult Group::CanJoinBattlegroundQueue(Battleground const* bgTemplate, BattlegroundQueueTypeId  /*bgQueueTypeId*/, uint32 MinPlayerCount, uint32 /*MaxPlayerCount*/, bool isRated, uint32 arenaSlot)
+GroupJoinBattlegroundResult Group::CanJoinBattlegroundQueue(Battleground const* bgTemplate, BattlegroundQueueTypeId bgQueueTypeId, uint32 MinPlayerCount, uint32 /*MaxPlayerCount*/, bool isRated, uint32 arenaSlot)
 {
     // check if this group is LFG group
     if (isLFGGroup())
@@ -1965,7 +1989,7 @@ GroupJoinBattlegroundResult Group::CanJoinBattlegroundQueue(Battleground const* 
     if (!reference)
         return ERR_BATTLEGROUND_JOIN_FAILED;
 
-    PvPDifficultyEntry const* bracketEntry = GetBattlegroundBracketByLevel(bgTemplate->GetMapId(), reference->getLevel());
+    PvPDifficultyEntry const* bracketEntry = GetBattlegroundBracketByLevel(bgTemplate->GetMapId(), reference->GetLevel());
     if (!bracketEntry)
         return ERR_BATTLEGROUND_JOIN_FAILED;
 
@@ -1996,7 +2020,7 @@ GroupJoinBattlegroundResult Group::CanJoinBattlegroundQueue(Battleground const* 
             return ERR_BATTLEGROUND_JOIN_FAILED;
 
         // not in the same battleground level braket, don't let join
-        PvPDifficultyEntry const* memberBracketEntry = GetBattlegroundBracketByLevel(bracketEntry->mapId, member->getLevel());
+        PvPDifficultyEntry const* memberBracketEntry = GetBattlegroundBracketByLevel(bracketEntry->mapId, member->GetLevel());
         if (memberBracketEntry != bracketEntry)
             return ERR_BATTLEGROUND_JOIN_RANGE_INDEX;
 
@@ -2005,8 +2029,11 @@ GroupJoinBattlegroundResult Group::CanJoinBattlegroundQueue(Battleground const* 
             return ERR_GROUP_JOIN_BATTLEGROUND_DESERTERS;
 
         // check if someone in party is using dungeon system
-        if (member->isUsingLfg())
+        lfg::LfgState lfgState = sLFGMgr->GetState(member->GetGUID());
+        if (lfgState > lfg::LFG_STATE_NONE && (lfgState != lfg::LFG_STATE_QUEUED || !sWorld->getBoolConfig(CONFIG_ALLOW_JOIN_BG_AND_LFG)))
+        {
             return ERR_LFG_CANT_USE_BATTLEGROUND;
+        }
 
         // pussywizard: prevent joining when any member is in bg/arena
         if (member->InBattleground())
@@ -2015,6 +2042,12 @@ GroupJoinBattlegroundResult Group::CanJoinBattlegroundQueue(Battleground const* 
         // pussywizard: check for free slot, this is actually ensured before calling this function, but just in case
         if (!member->HasFreeBattlegroundQueueId())
             return ERR_BATTLEGROUND_TOO_MANY_QUEUES;
+
+        // don't let join if someone from the group is already in that bg queue
+        if (member->InBattlegroundQueueForBattlegroundQueueType(bgQueueTypeId))
+        {
+            return ERR_BATTLEGROUND_JOIN_FAILED;
+        }
 
         // don't let join if someone from the group is in bg queue random
         if (member->InBattlegroundQueueForBattlegroundQueueType(bgQueueTypeIdRandom))
@@ -2027,6 +2060,11 @@ GroupJoinBattlegroundResult Group::CanJoinBattlegroundQueue(Battleground const* 
         // don't let Death Knights join BG queues when they are not allowed to be teleported yet
         if (member->getClass() == CLASS_DEATH_KNIGHT && member->GetMapId() == 609 && !member->IsGameMaster() && !member->HasSpell(50977))
             return ERR_GROUP_JOIN_BATTLEGROUND_FAIL;
+
+        if (!member->GetBGAccessByLevel(bgTemplate->GetBgTypeID()))
+        {
+            return ERR_BATTLEGROUND_JOIN_TIMED_OUT;
+        }
     }
 
     // for arenas: check party size is proper
@@ -2115,7 +2153,11 @@ void Group::ResetInstances(uint8 method, bool isRaid, Player* leader)
                         toUnbind.push_back(instanceSave);
                     }
                     else
+                    {
                         leader->SendResetInstanceFailed(0, instanceSave->GetMapId());
+                    }
+
+                    sInstanceSaveMgr->DeleteInstanceSavedData(instanceSave->GetInstanceId());
                 }
                 for (std::vector<InstanceSave*>::const_iterator itr = toUnbind.begin(); itr != toUnbind.end(); ++itr)
                     sInstanceSaveMgr->UnbindAllFor(*itr);
@@ -2139,7 +2181,11 @@ void Group::ResetInstances(uint8 method, bool isRaid, Player* leader)
                         toUnbind.push_back(instanceSave);
                     }
                     else
+                    {
                         leader->SendResetInstanceFailed(0, instanceSave->GetMapId());
+                    }
+
+                    sInstanceSaveMgr->DeleteInstanceSavedData(instanceSave->GetInstanceId());
                 }
                 for (std::vector<InstanceSave*>::const_iterator itr = toUnbind.begin(); itr != toUnbind.end(); ++itr)
                     sInstanceSaveMgr->UnbindAllFor(*itr);
@@ -2256,9 +2302,19 @@ bool Group::IsCreated() const
     return GetMembersCount() > 0;
 }
 
+GroupType Group::GetGroupType() const
+{
+    return m_groupType;
+}
+
 ObjectGuid Group::GetLeaderGUID() const
 {
     return m_leaderGuid;
+}
+
+Player* Group::GetLeader()
+{
+    return ObjectAccessor::FindConnectedPlayer(m_leaderGuid);
 }
 
 ObjectGuid Group::GetGUID() const
@@ -2496,4 +2552,16 @@ void Group::SetDifficultyChangePrevention(DifficultyPreventionChangeType type)
 {
     _difficultyChangePreventionTime = GameTime::GetGameTime().count() + MINUTE;
     _difficultyChangePreventionType = type;
+}
+
+void Group::DoForAllMembers(std::function<void(Player*)> const& worker)
+{
+    for (GroupReference* itr = GetFirstMember(); itr != nullptr; itr = itr->next())
+    {
+        Player* member = itr->GetSource();
+        if (!member)
+            continue;
+
+        worker(member);
+    }
 }

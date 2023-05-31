@@ -155,7 +155,7 @@ struct npc_pet_gen_argent_pony_bridle : public ScriptedAI
         memset(_banners, 0, sizeof(_banners));
     }
 
-    void EnterEvadeMode() override
+    void EnterEvadeMode(EvadeReason /*why*/) override
     {
         if (Unit* owner = me->GetCharmerOrOwner())
         {
@@ -172,7 +172,7 @@ struct npc_pet_gen_argent_pony_bridle : public ScriptedAI
         _init = true;
         uint32 duration = 0;
         uint32 aura = 0;
-        me->SetUInt32Value(UNIT_NPC_FLAGS, 0);
+        me->ReplaceAllNpcFlags(UNIT_NPC_FLAG_NONE);
 
         if (Unit* owner = me->GetCharmerOrOwner())
             if (Player* player = owner->ToPlayer())
@@ -182,7 +182,7 @@ struct npc_pet_gen_argent_pony_bridle : public ScriptedAI
 
                     aura = (player->GetTeamId(true) == TEAM_ALLIANCE ? SPELL_AURA_TIRED_S : SPELL_AURA_TIRED_G);
                     duration = player->GetSpellCooldownDelay(aura);
-                    me->SetUInt32Value(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_GOSSIP);
+                    me->ReplaceAllNpcFlags(UNIT_NPC_FLAG_GOSSIP);
 
                     for (uint8 i = 0; i < 3; ++i)
                     {
@@ -231,7 +231,7 @@ struct npc_pet_gen_argent_pony_bridle : public ScriptedAI
         {
             _mountTimer = 0;
             if (_state == ARGENT_PONY_STATE_NONE)
-                me->SetUInt32Value(UNIT_NPC_FLAGS, 0);
+                me->ReplaceAllNpcFlags(UNIT_NPC_FLAG_NONE);
             else if (Unit* owner = me->GetCharmerOrOwner())
             {
                 if (owner->IsMounted() && !me->IsMounted())
@@ -294,20 +294,20 @@ struct npc_pet_gen_argent_pony_bridle : public ScriptedAI
         switch (action)
         {
             case GOSSIP_ACTION_TRADE:
-                creature->SetUInt32Value(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_VENDOR);
+                creature->ReplaceAllNpcFlags(UNIT_NPC_FLAG_VENDOR);
                 player->GetSession()->SendListInventory(creature->GetGUID());
                 spellId = player->GetTeamId(true) ? SPELL_AURA_SHOP_G : SPELL_AURA_SHOP_S;
                 creature->AI()->DoAction(ARGENT_PONY_STATE_VENDOR);
                 break;
             case GOSSIP_ACTION_BANK:
-                creature->SetUInt32Value(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_BANKER);
+                creature->ReplaceAllNpcFlags(UNIT_NPC_FLAG_BANKER);
                 player->GetSession()->SendShowBank(player->GetGUID());
                 spellId = player->GetTeamId(true) ? SPELL_AURA_BANK_G : SPELL_AURA_BANK_S;
                 creature->AI()->DoAction(ARGENT_PONY_STATE_BANK);
                 break;
             case GOSSIP_ACTION_MAILBOX:
                 {
-                    creature->SetUInt32Value(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_GOSSIP | UNIT_NPC_FLAG_MAILBOX);
+                    creature->ReplaceAllNpcFlags(UNIT_NPC_FLAG_GOSSIP | UNIT_NPC_FLAG_MAILBOX);
                     player->GetSession()->SendShowMailBox(creature->GetGUID());
                     spellId = player->GetTeamId(true) ? SPELL_AURA_POSTMAN_G : SPELL_AURA_POSTMAN_S;
                     creature->AI()->DoAction(ARGENT_PONY_STATE_MAILBOX);
@@ -640,7 +640,7 @@ struct npc_pet_gen_plump_turkey : public PassiveAI
     {
         if (type == EFFECT_MOTION_TYPE && id == 1)
         {
-            Unit::Kill(me, me);
+            me->KillSelf();
             me->AddAura(SPELL_TURKEY_STARTS_TO_BURN, me);
         }
     }
@@ -689,9 +689,7 @@ struct npc_pet_gen_toxic_wasteling : public PassiveAI
 
     void Reset() override { checkTimer = 3000; }
 
-    void EnterEvadeMode() override
-    {
-    }
+    void EnterEvadeMode(EvadeReason /*why*/) override {}
 
     void MovementInform(uint32 type, uint32 id) override
     {
@@ -729,7 +727,7 @@ struct npc_pet_gen_fetch_ball : public NullCreatureAI
     uint32 checkTimer;
     ObjectGuid targetGUID;
 
-    void IsSummonedBy(Unit* summoner) override
+    void IsSummonedBy(WorldObject* summoner) override
     {
         if (!summoner)
             return;

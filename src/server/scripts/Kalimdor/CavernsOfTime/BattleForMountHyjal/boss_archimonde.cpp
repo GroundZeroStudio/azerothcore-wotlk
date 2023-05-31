@@ -124,10 +124,10 @@ public:
 
             ArchimondeGUID = instance->GetGuidData(DATA_ARCHIMONDE);
 
-            me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
+            me->SetUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
         }
 
-        void EnterCombat(Unit* /*who*/) override { }
+        void JustEngagedWith(Unit* /*who*/) override { }
 
         void DamageTaken(Unit*, uint32& damage, DamageEffectType, SpellSchoolMask) override
         {
@@ -172,7 +172,7 @@ public:
 
         void MoveInLineOfSight(Unit* /*who*/) override { }
 
-        void EnterCombat(Unit* /*who*/) override { }
+        void JustEngagedWith(Unit* /*who*/) override { }
 
         void DamageTaken(Unit*, uint32& damage, DamageEffectType, SpellSchoolMask) override
         {
@@ -215,7 +215,7 @@ public:
                 TargetGUID = who->GetGUID();
         }
 
-        void EnterCombat(Unit* /*who*/) override { }
+        void JustEngagedWith(Unit* /*who*/) override { }
 
         void DamageTaken(Unit*, uint32& damage, DamageEffectType, SpellSchoolMask) override
         {
@@ -325,7 +325,7 @@ public:
                 return;
 
             // Now lets get archimode threat list
-            ThreatContainer::StorageType const& t_list = me->getThreatMgr().getThreatList();
+            ThreatContainer::StorageType const& t_list = me->GetThreatMgr().GetThreatList();
 
             if (t_list.empty())
                 return;
@@ -347,7 +347,7 @@ public:
                 }
         }
 
-        void EnterCombat(Unit* /*who*/) override
+        void JustEngagedWith(Unit* /*who*/) override
         {
             me->InterruptSpell(CURRENT_CHANNELED_SPELL);
             Talk(SAY_AGGRO);
@@ -435,7 +435,7 @@ public:
                 if (victim && me->IsWithinMeleeRange(victim))
                     return false;
 
-                ThreatContainer::StorageType const& threatlist = me->getThreatMgr().getThreatList();
+                ThreatContainer::StorageType const& threatlist = me->GetThreatMgr().GetThreatList();
                 if (threatlist.empty())
                     return false;
 
@@ -464,8 +464,8 @@ public:
             else
             {
                 summoned->SetFaction(me->GetFaction());
-                summoned->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
-                summoned->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
+                summoned->SetUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
+                summoned->SetUnitFlag(UNIT_FLAG_NOT_SELECTABLE);
             }
 
             if (summoned->GetEntry() == CREATURE_DOOMFIRE_SPIRIT)
@@ -576,7 +576,7 @@ public:
 
                             if (Unit* Nordrassil = ObjectAccessor::GetUnit(*me, WorldTreeGUID))
                             {
-                                Nordrassil->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
+                                Nordrassil->SetUnitFlag(UNIT_FLAG_NOT_SELECTABLE);
                                 Nordrassil->SetDisplayId(11686);
                                 DoCast(Nordrassil, SPELL_DRAIN_WORLD_TREE);
                                 IsChanneling = true;

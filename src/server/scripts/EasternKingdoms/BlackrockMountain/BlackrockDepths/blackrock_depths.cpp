@@ -121,13 +121,13 @@ public:
     };
 };
 
-struct Wave
+struct WaveCreature
 {
     uint32 entry;
     uint32 amount;
 };
 
-static Wave RingMobs[] = // different amounts based on the type
+static WaveCreature RingMobs[] = // different amounts based on the type
 {
     {NPC_DREDGE_WORM, 3},
     {NPC_DEEP_STINGER, 3},
@@ -219,7 +219,7 @@ public:
 
         void Reset() override
         {
-            me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
+            me->SetUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
         }
 
         void JustSummoned(Creature* summon) override

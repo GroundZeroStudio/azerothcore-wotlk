@@ -37,7 +37,10 @@ public:
 
     struct instance_shadowfang_keep_InstanceMapScript : public InstanceScript
     {
-        instance_shadowfang_keep_InstanceMapScript(Map* map) : InstanceScript(map) { }
+        instance_shadowfang_keep_InstanceMapScript(Map* map) : InstanceScript(map)
+        {
+            SetHeaders(DataHeader);
+        }
 
         void Initialize() override
         {
@@ -50,6 +53,15 @@ public:
             {
                 case NPC_DND_CRAZED_APOTHECARY_GENERATOR:
                     _crazedApothecaryGeneratorGUIDs.push_back(creature->GetGUID());
+                    break;
+                case NPC_APOTHECARY_HUMMEL:
+                    _apothecaryHummel = creature->GetGUID();
+                    break;
+                case NPC_CRAZED_APOTHECARY:
+                    if (Creature* hummel = instance->GetCreature(_apothecaryHummel))
+                    {
+                        hummel->AI()->JustSummoned(creature);
+                    }
                     break;
                 default:
                     break;
@@ -103,35 +115,22 @@ public:
                 SaveToDB();
         }
 
-        std::string GetSaveData() override
+        void ReadSaveDataMore(std::istringstream& data) override
         {
-            std::ostringstream saveStream;
-            saveStream << "S K " << _encounters[0] << ' ' << _encounters[1] << ' ' << _encounters[2];
-            return saveStream.str();
+            data >> _encounters[0];
+            data >> _encounters[1];
+            data >> _encounters[2];
         }
 
-        void Load(const char* in) override
+        void WriteSaveDataMore(std::ostringstream& data) override
         {
-            if (!in)
-                return;
-
-            char dataHead1, dataHead2;
-            std::istringstream loadStream(in);
-            loadStream >> dataHead1 >> dataHead2;
-            if (dataHead1 == 'S' && dataHead2 == 'K')
-            {
-                for (uint8 i = 0; i < MAX_ENCOUNTERS; ++i)
-                {
-                    loadStream >> _encounters[i];
-                    if (_encounters[i] == IN_PROGRESS)
-                        _encounters[i] = NOT_STARTED;
-                }
-            }
+            data << _encounters[0] << ' ' << _encounters[1] << ' ' << _encounters[2];
         }
 
     private:
         uint32 _encounters[MAX_ENCOUNTERS];
         GuidVector _crazedApothecaryGeneratorGUIDs;
+        ObjectGuid _apothecaryHummel;
     };
 };
 

@@ -106,18 +106,18 @@ struct boss_volazj : public BossAI
         insanityTimes = 0;
         insanityPhase = false;
 
-        me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
+        me->RemoveUnitFlag(UNIT_FLAG_NOT_SELECTABLE);
         me->SetControlled(false, UNIT_STATE_STUNNED);
         ResetPlayersPhaseMask();
         instance->DoStopTimedAchievement(ACHIEVEMENT_TIMED_TYPE_EVENT, ACHIEV_QUICK_DEMISE_START_EVENT);
     }
 
-    void EnterCombat(Unit* /*who*/) override
+    void JustEngagedWith(Unit* /*who*/) override
     {
-        _EnterCombat();
-        events.ScheduleEvent(EVENT_HERALD_MIND_FLAY, 8000);
-        events.ScheduleEvent(EVENT_HERALD_SHADOW, 5000);
-        events.ScheduleEvent(EVENT_HERALD_SHIVER, 15000);
+        _JustEngagedWith();
+        events.ScheduleEvent(EVENT_HERALD_MIND_FLAY, 8s);
+        events.ScheduleEvent(EVENT_HERALD_SHADOW, 5s);
+        events.ScheduleEvent(EVENT_HERALD_SHIVER, 15s);
         Talk(SAY_AGGRO);
         DoCastSelf(SPELL_WHISPER_AGGRO);
         instance->DoStartTimedAchievement(ACHIEVEMENT_TIMED_TYPE_EVENT, ACHIEV_QUICK_DEMISE_START_EVENT);
@@ -127,7 +127,7 @@ struct boss_volazj : public BossAI
     void JustDied(Unit* /*killer*/) override
     {
         _JustDied();
-        me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
+        me->RemoveUnitFlag(UNIT_FLAG_NOT_SELECTABLE);
         me->SetControlled(false, UNIT_STATE_STUNNED);
         ResetPlayersPhaseMask();
 
@@ -223,7 +223,7 @@ struct boss_volazj : public BossAI
             }
 
             insanityPhase = false;
-            me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
+            me->RemoveUnitFlag(UNIT_FLAG_NOT_SELECTABLE);
             me->SetControlled(false, UNIT_STATE_STUNNED);
             me->RemoveAurasDueToSpell(INSANITY_VISUAL);
         }
@@ -241,13 +241,13 @@ struct boss_volazj : public BossAI
                 case EVENT_HERALD_MIND_FLAY:
                 {
                     DoCastVictim(SPELL_MIND_FLAY, false);
-                    events.RepeatEvent(20000);
+                    events.Repeat(20s);
                     break;
                 }
                 case EVENT_HERALD_SHADOW:
                 {
                     DoCastVictim(SPELL_SHADOW_BOLT_VOLLEY, false);
-                    events.RepeatEvent(5000);
+                    events.Repeat(5s);
                     break;
                 }
                 case EVENT_HERALD_SHIVER:
@@ -257,7 +257,7 @@ struct boss_volazj : public BossAI
                         DoCast(pTarget, SPELL_SHIVER, false);
                     }
 
-                    events.RepeatEvent(15000);
+                    events.Repeat(15s);
                     break;
                 }
             }
@@ -376,7 +376,7 @@ class spell_herald_volzaj_insanity : public SpellScript
         caster->CastSpell(caster, SPELL_WHISPER_INSANITY, true);
         caster->RemoveAllAuras();
         caster->CastSpell(caster, INSANITY_VISUAL, true);
-        caster->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
+        caster->SetUnitFlag(UNIT_FLAG_NOT_SELECTABLE);
         caster->SetControlled(true, UNIT_STATE_STUNNED);
 
         // Handle phase effect

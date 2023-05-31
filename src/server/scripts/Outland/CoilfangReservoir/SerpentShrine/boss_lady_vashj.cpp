@@ -138,9 +138,9 @@ public:
             BossAI::JustDied(killer);
         }
 
-        void EnterCombat(Unit* who) override
+        void JustEngagedWith(Unit* who) override
         {
-            BossAI::EnterCombat(who);
+            BossAI::JustEngagedWith(who);
             Talk(SAY_AGGRO);
 
             me->CastSpell(me, SPELL_REMOVE_TAINTED_CORES, true);
@@ -195,7 +195,6 @@ public:
 
         void UpdateAI(uint32 diff) override
         {
-            EnterEvadeIfOutOfCombatArea();
             if (!UpdateVictim())
                 return;
 

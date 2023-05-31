@@ -23,10 +23,10 @@
 
 DoorData const doorData[] =
 {
-    { GO_LADY_VASHJ_BRIDGE_CONSOLE, DATA_BRIDGE_EMERGED, DOOR_TYPE_PASSAGE, BOUNDARY_NONE },
-    { GO_COILFANG_BRIDGE1,          DATA_BRIDGE_EMERGED, DOOR_TYPE_PASSAGE, BOUNDARY_NONE },
-    { GO_COILFANG_BRIDGE2,          DATA_BRIDGE_EMERGED, DOOR_TYPE_PASSAGE, BOUNDARY_NONE },
-    { GO_COILFANG_BRIDGE3,          DATA_BRIDGE_EMERGED, DOOR_TYPE_PASSAGE, BOUNDARY_NONE }
+    { GO_LADY_VASHJ_BRIDGE_CONSOLE, DATA_BRIDGE_EMERGED, DOOR_TYPE_PASSAGE },
+    { GO_COILFANG_BRIDGE1,          DATA_BRIDGE_EMERGED, DOOR_TYPE_PASSAGE },
+    { GO_COILFANG_BRIDGE2,          DATA_BRIDGE_EMERGED, DOOR_TYPE_PASSAGE },
+    { GO_COILFANG_BRIDGE3,          DATA_BRIDGE_EMERGED, DOOR_TYPE_PASSAGE }
 };
 
 class instance_serpent_shrine : public InstanceMapScript
@@ -42,6 +42,7 @@ public:
 
         void Initialize() override
         {
+            SetHeaders(DataHeader);
             SetBossNumber(MAX_ENCOUNTERS);
             LoadDoorData(doorData);
 
@@ -56,7 +57,7 @@ public:
             if (type == DATA_LADY_VASHJ)
                 for (uint8 i = 0; i < 4; ++i)
                     if (GameObject* gobject = instance->GetGameObject(ShieldGeneratorGUID[i]))
-                        gobject->SetFlag(GAMEOBJECT_FLAGS, GO_FLAG_NOT_SELECTABLE);
+                        gobject->SetGameObjectFlag(GO_FLAG_NOT_SELECTABLE);
 
             return true;
         }
@@ -158,7 +159,7 @@ public:
                         for (uint8 i = 0; i < 4; ++i)
                             if (GameObject* gobject = instance->GetGameObject(ShieldGeneratorGUID[i]))
                             {
-                                gobject->RemoveFlag(GAMEOBJECT_FLAGS, GO_FLAG_NOT_SELECTABLE);
+                                gobject->RemoveGameObjectFlag(GO_FLAG_NOT_SELECTABLE);
                                 vashj->SummonTrigger(gobject->GetPositionX(), gobject->GetPositionY(), gobject->GetPositionZ(), 0.0f, 0);
                             }
                     break;
@@ -171,49 +172,6 @@ public:
                 return AliveKeepersCount;
 
             return 0;
-        }
-
-        std::string GetSaveData() override
-        {
-            OUT_SAVE_INST_DATA;
-
-            std::ostringstream saveStream;
-            saveStream << "S C " << GetBossSaveData();
-
-            OUT_SAVE_INST_DATA_COMPLETE;
-            return saveStream.str();
-        }
-
-        void Load(char const* str) override
-        {
-            if (!str)
-            {
-                OUT_LOAD_INST_DATA_FAIL;
-                return;
-            }
-
-            OUT_LOAD_INST_DATA(str);
-
-            char dataHead1, dataHead2;
-
-            std::istringstream loadStream(str);
-            loadStream >> dataHead1 >> dataHead2;
-
-            if (dataHead1 == 'S' && dataHead2 == 'C')
-            {
-                for (uint8 i = 0; i < MAX_ENCOUNTERS; ++i)
-                {
-                    uint32 tmpState;
-                    loadStream >> tmpState;
-                    if (tmpState == IN_PROGRESS || tmpState > SPECIAL)
-                        tmpState = NOT_STARTED;
-                    SetBossState(i, EncounterState(tmpState));
-                }
-            }
-            else
-                OUT_LOAD_INST_DATA_FAIL;
-
-            OUT_LOAD_INST_DATA_COMPLETE;
         }
 
     private:

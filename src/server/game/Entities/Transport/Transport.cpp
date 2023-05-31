@@ -84,7 +84,7 @@ bool MotionTransport::CreateMoTrans(ObjectGuid::LowType guidlow, uint32 entry, u
     if (GameObjectTemplateAddon const* addon = GetTemplateAddon())
     {
         SetUInt32Value(GAMEOBJECT_FACTION, addon->faction);
-        SetUInt32Value(GAMEOBJECT_FLAGS, addon->flags);
+        ReplaceAllGameObjectFlags((GameObjectFlags)addon->flags);
     }
 
     SetObjectScale(goinfo->size);
@@ -422,7 +422,7 @@ void MotionTransport::LoadStaticPassengers()
             // GameObjects on transport
             guidEnd = cellItr->second.gameobjects.end();
             for (CellGuidSet::const_iterator guidItr = cellItr->second.gameobjects.begin(); guidItr != guidEnd; ++guidItr)
-                CreateGOPassenger(*guidItr, sObjectMgr->GetGOData(*guidItr));
+                CreateGOPassenger(*guidItr, sObjectMgr->GetGameObjectData(*guidItr));
         }
     }
 }
@@ -727,7 +727,7 @@ bool StaticTransport::Create(ObjectGuid::LowType guidlow, uint32 name_id, Map* m
     if (GameObjectTemplateAddon const* addon = GetTemplateAddon())
     {
         SetUInt32Value(GAMEOBJECT_FACTION, addon->faction);
-        SetUInt32Value(GAMEOBJECT_FLAGS, addon->flags);
+        ReplaceAllGameObjectFlags((GameObjectFlags)addon->flags);
     }
 
     SetEntry(goinfo->entry);
@@ -1003,4 +1003,11 @@ void StaticTransport::RemovePassenger(WorldObject* passenger, bool withAll)
             passenger->m_movementInfo.transport.pos.Relocate(0.0f, 0.0f, 0.0f, 0.0f);
         }
     }
+}
+
+std::string MotionTransport::GetDebugInfo() const
+{
+    std::stringstream sstr;
+    sstr << GameObject::GetDebugInfo();
+    return sstr.str();
 }

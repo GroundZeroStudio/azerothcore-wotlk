@@ -145,7 +145,7 @@ public:
             if (param == ACTION_START_EVENT)
             {
                 me->SetVisible(true);
-                me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
+                me->SetUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
                 events2.ScheduleEvent(EVENT_INTRO_1, 3000);
             }
         }
@@ -153,17 +153,17 @@ public:
         void Reset() override
         {
             BossAI::Reset();
-            me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
+            me->RemoveUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
             me->SetReactState(REACT_PASSIVE);
             me->SetDisableGravity(false);
             events2.Reset();
             instance->DoRemoveAurasDueToSpellOnPlayers(SPELL_FOG_OF_CORRUPTION_CHARM);
         }
 
-        void EnterCombat(Unit* who) override
+        void JustEngagedWith(Unit* who) override
         {
-            BossAI::EnterCombat(who);
-            me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
+            BossAI::JustEngagedWith(who);
+            me->SetUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
             if (events.Empty() && events2.Empty())
                 events2.ScheduleEvent(EVENT_INTRO_2, 3000);
         }
@@ -262,7 +262,7 @@ public:
                     events.ScheduleEvent(EVENT_LAND, 3000, 1);
                     events.ScheduleEvent(EVENT_SPELL_BERSERK, 600000);
                     me->SetInCombatWithZone();
-                    me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
+                    me->RemoveUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
                     me->CastSpell(me, SPELL_NOXIOUS_FUMES, true);
                     me->GetMotionMaster()->MovePoint(POINT_MISC, 1472.18f, 603.38f, 34.0f, false, true);
                     break;

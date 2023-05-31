@@ -101,7 +101,7 @@ public:
             envelopingWinds_Timer = 9000;
             shock_Timer = 5000;
 
-            me->RemoveFlag(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_QUESTGIVER);
+            me->RemoveNpcFlag(UNIT_NPC_FLAG_QUESTGIVER);
             me->SetFaction(FACTION_FRIENDLY);
 
             Talk(SAY_SUMMON);
@@ -125,9 +125,9 @@ public:
             if (HealthBelowPct(30))
             {
                 me->SetFaction(FACTION_FRIENDLY);
-                me->SetFlag(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_QUESTGIVER);
+                me->SetNpcFlag(UNIT_NPC_FLAG_QUESTGIVER);
                 me->RemoveAllAuras();
-                me->DeleteThreatList();
+                me->GetThreatMgr().ClearAllThreat();
                 me->CombatStop(true);
                 Talk(SAY_FREE);
                 return;
@@ -261,7 +261,7 @@ public:
 
         void Reset() override { }
 
-        void EnterCombat(Unit* /*who*/) override
+        void JustEngagedWith(Unit* /*who*/) override
         {
             if (HasEscortState(STATE_ESCORT_ESCORTING))
                 Talk(SAY_ELF_AGGRO);
@@ -329,7 +329,8 @@ public:
 enum FelGuard
 {
     SPELL_SUMMON_POO            = 37688,
-    NPC_DERANGED_HELBOAR        = 16863
+    NPC_DERANGED_HELBOAR        = 16863,
+    QUEST_SHIZZ_WORK            = 10629,
 };
 
 class npc_fel_guard_hound : public CreatureScript
@@ -358,7 +359,7 @@ public:
                 DoCast(SPELL_SUMMON_POO);
 
                 if (Player* owner = me->GetCharmerOrOwnerPlayerOrPlayerItself())
-                    me->GetMotionMaster()->MoveFollow(owner, 0.0f, 0.0f);
+                    me->GetMotionMaster()->MoveFollow(owner, 1.0f, 90.0f);
             }
         }
 
@@ -372,6 +373,13 @@ public:
                     {
                         helboarGUID = helboar->GetGUID();
                         me->GetMotionMaster()->MovePoint(1, helboar->GetPositionX(), helboar->GetPositionY(), helboar->GetPositionZ());
+                    }
+                }
+                if (Player* owner = me->GetCharmerOrOwnerPlayerOrPlayerItself())
+                {
+                    if (!owner->HasQuest(QUEST_SHIZZ_WORK))
+                    {
+                        me->DespawnOrUnsummon();
                     }
                 }
                 checkTimer = 5000;

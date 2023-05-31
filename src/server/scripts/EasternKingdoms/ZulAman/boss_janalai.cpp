@@ -175,7 +175,7 @@ public:
             Talk(SAY_SLAY);
         }
 
-        void EnterCombat(Unit* /*who*/) override
+        void JustEngagedWith(Unit* /*who*/) override
         {
             instance->SetData(DATA_JANALAIEVENT, IN_PROGRESS);
 
@@ -274,9 +274,9 @@ public:
             {
                 if (Unit* FireBomb = ObjectAccessor::GetUnit(*me, FireBombGUIDs[BombCount]))
                 {
-                    FireBomb->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
+                    FireBomb->RemoveUnitFlag(UNIT_FLAG_NOT_SELECTABLE);
                     DoCast(FireBomb, SPELL_FIRE_BOMB_THROW, true);
-                    FireBomb->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
+                    FireBomb->SetUnitFlag(UNIT_FLAG_NOT_SELECTABLE);
                 }
                 ++BombCount;
                 if (BombCount == 40)
@@ -402,8 +402,6 @@ public:
                 else HatcherTimer -= diff;
             }
 
-            EnterEvadeIfOutOfCombatArea();
-
             DoMeleeAttackIfReady();
 
             if (FireBreathTimer <= diff)
@@ -453,7 +451,7 @@ public:
                 DoCast(me, SPELL_FIRE_BOMB_DUMMY, true);
         }
 
-        void EnterCombat(Unit* /*who*/) override { }
+        void JustEngagedWith(Unit* /*who*/) override { }
 
         void AttackStart(Unit* /*who*/) override { }
 
@@ -526,7 +524,7 @@ public:
             return num == 0;   // if num == 0, no more templist
         }
 
-        void EnterCombat(Unit* /*who*/) override { }
+        void JustEngagedWith(Unit* /*who*/) override { }
         void AttackStart(Unit* /*who*/) override { }
         void MoveInLineOfSight(Unit* /*who*/) override { }
 
@@ -620,7 +618,7 @@ public:
             me->SetDisableGravity(true);
         }
 
-        void EnterCombat(Unit* /*who*/) override {/*DoZoneInCombat();*/ }
+        void JustEngagedWith(Unit* /*who*/) override {/*DoZoneInCombat();*/ }
 
         void UpdateAI(uint32 diff) override
         {

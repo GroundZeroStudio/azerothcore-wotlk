@@ -29,6 +29,12 @@ class Appender;
 class Logger;
 struct LogMessage;
 
+namespace Acore::Asio
+{
+    class IoContext;
+    class Strand;
+}
+
 #define LOGGER_ROOT "root"
 
 typedef Appender*(*AppenderCreatorFn)(uint8 id, std::string const& name, LogLevel level, AppenderFlags flags, std::vector<std::string_view> const& extraArgs);
@@ -54,7 +60,8 @@ private:
 public:
     static Log* instance();
 
-    void Initialize();
+    void Initialize(Acore::Asio::IoContext* ioContext = nullptr);
+    void SetSynchronous();  // Not threadsafe - should only be called from main() after all threads are joined
     void LoadFromConfig();
     void Close();
     [[nodiscard]] bool ShouldLog(std::string const& type, LogLevel level) const;
@@ -76,8 +83,6 @@ public:
 
         _outCommand(Acore::StringFormatFmt(fmt, std::forward<Args>(args)...), std::to_string(account));
     }
-
-    void outCharDump(std::string_view str, uint32 account_id, uint64 guid, std::string_view name);
 
     void SetRealmId(uint32 id);
 
@@ -114,6 +119,8 @@ private:
     std::string m_logsDir;
     std::string m_logsTimestamp;
 
+    Acore::Asio::IoContext* _ioContext;
+    Acore::Asio::Strand* _strand;
     // Deprecated debug filter logs
     DebugLogFilters _debugLogMask;
 };
@@ -167,9 +174,6 @@ private:
 // Trace - 6
 #define LOG_TRACE(filterType__, ...) \
     LOG_MESSAGE_BODY(filterType__, LogLevel::LOG_LEVEL_TRACE, __VA_ARGS__)
-
-#define LOG_CHAR_DUMP(message__, accountId__, guid__, name__) \
-    sLog->outCharDump(message__, accountId__, guid__, name__)
 
 #define LOG_GM(accountId__, ...) \
     sLog->outCommand(accountId__, __VA_ARGS__)

@@ -20,9 +20,11 @@
 #include "AppenderFile.h"
 #include "Config.h"
 #include "Errors.h"
+#include "IoContext.h"
 #include "LogMessage.h"
 #include "LogOperation.h"
 #include "Logger.h"
+#include "Strand.h"
 #include "StringConvert.h"
 #include "Timer.h"
 #include "Tokenize.h"
@@ -38,6 +40,7 @@ Log::Log() : AppenderId(0), highestLogLevel(LOG_LEVEL_FATAL)
 
 Log::~Log()
 {
+    delete _strand;
     Close();
 }
 
@@ -240,7 +243,13 @@ void Log::write(std::unique_ptr<LogMessage>&& msg) const
 {
     Logger const* logger = GetLoggerByType(msg->type);
 
-    logger->write(msg.get());
+    if (_ioContext)
+    {
+        std::shared_ptr<LogOperation> logOperation = std::make_shared<LogOperation>(logger, std::move(msg));
+        Acore::Asio::post(*_ioContext, Acore::Asio::bind_executor(*_strand, [logOperation]() { logOperation->call(); }));
+    }
+    else
+        logger->write(msg.get());
 }
 
 Logger const* Log::GetLoggerByType(std::string const& type) const
@@ -314,21 +323,6 @@ bool Log::SetLogLevel(std::string const& name, int32 newLeveli, bool isLogger /*
     return true;
 }
 
-void Log::outCharDump(std::string_view str, uint32 accountId, uint64 guid, std::string_view name)
-{
-    if (str.empty() || !ShouldLog("entities.player.dump", LOG_LEVEL_INFO))
-    {
-        return;
-    }
-
-    std::string message = Acore::StringFormatFmt("== START DUMP == (account: {} guid: {} name: {})\n {} \n== END DUMP ==\n", accountId, guid, name, str);
-
-    std::unique_ptr<LogMessage> msg(new LogMessage(LOG_LEVEL_INFO, "entities.player.dump", message));
-    msg->param1 = Acore::StringFormatFmt("{}_{}", guid, name);
-
-    write(std::move(msg));
-}
-
 void Log::SetRealmId(uint32 id)
 {
     for (std::pair<uint8 const, std::unique_ptr<Appender>>& appender : appenders)
@@ -345,7 +339,7 @@ void Log::Close()
 
 bool Log::ShouldLog(std::string const& type, LogLevel level) const
 {
-    // TODO: Use cache to store "Type.sub1.sub2": "Type" equivalence, should
+    /// @todo: Use cache to store "Type.sub1.sub2": "Type" equivalence, should
     // Speed up in cases where requesting "Type.sub1.sub2" but only configured
     // Logger "Type"
 
@@ -371,9 +365,22 @@ Log* Log::instance()
     return &instance;
 }
 
-void Log::Initialize()
+void Log::Initialize(Acore::Asio::IoContext* ioContext)
 {
+    if (ioContext)
+    {
+        _ioContext = ioContext;
+        _strand = new Acore::Asio::Strand(*ioContext);
+    }
+
     LoadFromConfig();
+}
+
+void Log::SetSynchronous()
+{
+    delete _strand;
+    _strand = nullptr;
+    _ioContext = nullptr;
 }
 
 void Log::LoadFromConfig()

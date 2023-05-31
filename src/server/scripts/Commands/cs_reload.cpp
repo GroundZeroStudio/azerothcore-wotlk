@@ -24,6 +24,7 @@ EndScriptData */
 
 #include "AchievementMgr.h"
 #include "AuctionHouseMgr.h"
+#include "AutobroadcastMgr.h"
 #include "BattlegroundMgr.h"
 #include "Chat.h"
 #include "CreatureTextMgr.h"
@@ -32,6 +33,7 @@ EndScriptData */
 #include "LFGMgr.h"
 #include "Language.h"
 #include "MapMgr.h"
+#include "ServerMotd.h"
 #include "ObjectMgr.h"
 #include "ScriptMgr.h"
 #include "SkillDiscovery.h"
@@ -80,6 +82,7 @@ public:
             { "areatrigger_tavern",            HandleReloadAreaTriggerTavernCommand,          SEC_ADMINISTRATOR, Console::Yes },
             { "areatrigger_teleport",          HandleReloadAreaTriggerTeleportCommand,        SEC_ADMINISTRATOR, Console::Yes },
             { "autobroadcast",                 HandleReloadAutobroadcastCommand,              SEC_ADMINISTRATOR, Console::Yes },
+            { "motd",                          HandleReloadMotdCommand,                       SEC_ADMINISTRATOR, Console::Yes },
             { "broadcast_text",                HandleReloadBroadcastTextCommand,              SEC_ADMINISTRATOR, Console::Yes },
             { "battleground_template",         HandleReloadBattlegroundTemplate,              SEC_ADMINISTRATOR, Console::Yes },
             { "command",                       HandleReloadCommandCommand,                    SEC_ADMINISTRATOR, Console::Yes },
@@ -125,6 +128,7 @@ public:
             { "quest_request_item_locale",     HandleReloadLocalesQuestRequestItemsCommand,   SEC_ADMINISTRATOR, Console::Yes },
             { "mail_level_reward",             HandleReloadMailLevelRewardCommand,            SEC_ADMINISTRATOR, Console::Yes },
             { "mail_loot_template",            HandleReloadLootTemplatesMailCommand,          SEC_ADMINISTRATOR, Console::Yes },
+            { "mail_server_template",          HandleReloadMailServerTemplateCommand,         SEC_ADMINISTRATOR, Console::Yes },
             { "milling_loot_template",         HandleReloadLootTemplatesMillingCommand,       SEC_ADMINISTRATOR, Console::Yes },
             { "npc_spellclick_spells",         HandleReloadSpellClickSpellsCommand,           SEC_ADMINISTRATOR, Console::Yes },
             { "npc_trainer",                   HandleReloadNpcTrainerCommand,                 SEC_ADMINISTRATOR, Console::Yes },
@@ -133,10 +137,13 @@ public:
             { "pickpocketing_loot_template",   HandleReloadLootTemplatesPickpocketingCommand, SEC_ADMINISTRATOR, Console::Yes },
             { "points_of_interest",            HandleReloadPointsOfInterestCommand,           SEC_ADMINISTRATOR, Console::Yes },
             { "prospecting_loot_template",     HandleReloadLootTemplatesProspectingCommand,   SEC_ADMINISTRATOR, Console::Yes },
+            { "quest_greeting",                HandleReloadQuestGreetingCommand,              SEC_ADMINISTRATOR, Console::Yes },
+            { "quest_greeting_locale",         HandleReloadLocalesQuestGreetingCommand,       SEC_ADMINISTRATOR, Console::Yes },
             { "quest_poi",                     HandleReloadQuestPOICommand,                   SEC_ADMINISTRATOR, Console::Yes },
             { "quest_template",                HandleReloadQuestTemplateCommand,              SEC_ADMINISTRATOR, Console::Yes },
             { "reference_loot_template",       HandleReloadLootTemplatesReferenceCommand,     SEC_ADMINISTRATOR, Console::Yes },
             { "reserved_name",                 HandleReloadReservedNameCommand,               SEC_ADMINISTRATOR, Console::Yes },
+            { "profanity_name",                HandleReloadProfanityNameCommand,              SEC_ADMINISTRATOR, Console::Yes },
             { "reputation_reward_rate",        HandleReloadReputationRewardRateCommand,       SEC_ADMINISTRATOR, Console::Yes },
             { "reputation_spillover_template", HandleReloadReputationRewardRateCommand,       SEC_ADMINISTRATOR, Console::Yes },
             { "skill_discovery_template",      HandleReloadSkillDiscoveryTemplateCommand,     SEC_ADMINISTRATOR, Console::Yes },
@@ -195,8 +202,10 @@ public:
 
         HandleReloadDungeonAccessCommand(handler);
         HandleReloadMailLevelRewardCommand(handler);
+        HandleReloadMailServerTemplateCommand(handler);
         HandleReloadCommandCommand(handler);
         HandleReloadReservedNameCommand(handler);
+        HandleReloadProfanityNameCommand(handler);
         HandleReloadAcoreStringCommand(handler);
         HandleReloadGameTeleCommand(handler);
         HandleReloadCreatureMovementOverrideCommand(handler);
@@ -205,6 +214,7 @@ public:
         HandleReloadVehicleTemplateAccessoryCommand(handler);
 
         HandleReloadAutobroadcastCommand(handler);
+        HandleReloadMotdCommand(handler);
         HandleReloadBroadcastTextCommand(handler);
         HandleReloadBattlegroundTemplate(handler);
         return true;
@@ -213,7 +223,7 @@ public:
     static bool HandleReloadBattlegroundTemplate(ChatHandler* handler)
     {
         LOG_INFO("server.loading", "Re-Loading Battleground Templates...");
-        sBattlegroundMgr->CreateInitialBattlegrounds();
+        sBattlegroundMgr->LoadBattlegroundTemplates();
         handler->SendGlobalGMSysMessage("DB table `battleground_template` reloaded.");
         return true;
     }
@@ -254,9 +264,11 @@ public:
 
     static bool HandleReloadAllQuestCommand(ChatHandler* handler)
     {
+        HandleReloadQuestGreetingCommand(handler);
         HandleReloadQuestAreaTriggersCommand(handler);
         HandleReloadQuestPOICommand(handler);
         HandleReloadQuestTemplateCommand(handler);
+        HandleReloadLocalesQuestGreetingCommand(handler);
 
         LOG_INFO("server.loading", "Re-Loading Quests Relations...");
         sObjectMgr->LoadQuestStartersAndEnders();
@@ -392,8 +404,17 @@ public:
     static bool HandleReloadAutobroadcastCommand(ChatHandler* handler)
     {
         LOG_INFO("server.loading", "Re-Loading Autobroadcasts...");
-        sWorld->LoadAutobroadcasts();
+        sAutobroadcastMgr->LoadAutobroadcasts();
         handler->SendGlobalGMSysMessage("DB table `autobroadcast` reloaded.");
+        return true;
+    }
+
+    static bool HandleReloadMotdCommand(ChatHandler* handler)
+    {
+        LOG_INFO("server.loading", "Re-Loading Motd...");
+        sWorld->LoadMotd();
+        handler->SendGlobalGMSysMessage("DB table `motd` reloaded.");
+        handler->SendGlobalSysMessage(Motd::GetMotd());
         return true;
     }
 
@@ -526,6 +547,22 @@ public:
         LOG_INFO("server.loading", "Re-Loading Quest Area Triggers...");
         sObjectMgr->LoadQuestAreaTriggers();
         handler->SendGlobalGMSysMessage("DB table `areatrigger_involvedrelation` (quest area triggers) reloaded.");
+        return true;
+    }
+
+    static bool HandleReloadQuestGreetingCommand(ChatHandler* handler)
+    {
+        LOG_INFO("server.loading", "Re-Loading Quest Greeting ...");
+        sObjectMgr->LoadQuestGreetings();
+        handler->SendGlobalGMSysMessage("DB table `quest_greeting` reloaded.");
+        return true;
+    }
+
+    static bool HandleReloadLocalesQuestGreetingCommand(ChatHandler* handler)
+    {
+        LOG_INFO("server.loading", "Re-Loading Quest Greeting locales...");
+        sObjectMgr->LoadQuestGreetingsLocales();
+        handler->SendGlobalGMSysMessage("DB table `quest_greeting_locale` reloaded.");
         return true;
     }
 
@@ -744,9 +781,17 @@ public:
 
     static bool HandleReloadReservedNameCommand(ChatHandler* handler)
     {
-        LOG_INFO("server.loading", "Loading ReservedNames... (`reserved_name`)");
+        LOG_INFO("server.loading", "Re-Loading `reserved_player` Table!");
         sObjectMgr->LoadReservedPlayersNames();
-        handler->SendGlobalGMSysMessage("DB table `reserved_name` (player reserved names) reloaded.");
+        handler->SendGlobalGMSysMessage("DB table `reserved_name` reloaded.");
+        return true;
+    }
+
+    static bool HandleReloadProfanityNameCommand(ChatHandler* handler)
+    {
+        LOG_INFO("server.loading", "Re-Loading `profanity_player` Table!");
+        sObjectMgr->LoadProfanityPlayersNames();
+        handler->SendGlobalGMSysMessage("DB table `profanity_player` reloaded.");
         return true;
     }
 
@@ -850,7 +895,7 @@ public:
     static bool HandleReloadSpellBonusesCommand(ChatHandler* handler)
     {
         LOG_INFO("server.loading", "Re-Loading Spell Bonus Data...");
-        sSpellMgr->LoadSpellBonusess();
+        sSpellMgr->LoadSpellBonuses();
         handler->SendGlobalGMSysMessage("DB table `spell_bonus_data` (spell damage/healing coefficients) reloaded.");
         return true;
     }
@@ -1125,6 +1170,14 @@ public:
         LOG_INFO("server.loading", "Re-Loading Player level dependent mail rewards...");
         sObjectMgr->LoadMailLevelRewards();
         handler->SendGlobalGMSysMessage("DB table `mail_level_reward` reloaded.");
+        return true;
+    }
+
+    static bool HandleReloadMailServerTemplateCommand(ChatHandler* handler)
+    {
+        LOG_INFO("server.loading", "Re-Loading `server_mail_template` table");
+        sObjectMgr->LoadMailServerTemplates();
+        handler->SendGlobalGMSysMessage("DB table `server_mail_template` reloaded.");
         return true;
     }
 

@@ -40,10 +40,14 @@ public:
                 _owner.AI()->Talk(SAY_BATTERED_HILT_HALT);
                 break;
             case 3:
-                _owner.CastSpell((Unit*)nullptr, 69966, true);
+                _owner.CastSpell((Unit*)nullptr, SPELL_SUMMON_EVIL_QUEL, true);
                 _owner.AI()->Talk(SAY_BATTERED_HILT_REALIZE);
                 if (InstanceScript* instance = _owner.GetInstanceScript())
                     instance->SetData(DATA_BATTERED_HILT, 4);
+                if (Creature* quel = _owner.FindNearestCreature(NPC_QUEL_DELAR, 50))
+                {
+                    quel->AI()->Talk(EMOTE_QUEL_SPAWN);
+                }
                 _owner.m_Events.AddEvent(new UtherBatteredHiltEvent(_owner, 4), _owner.m_Events.CalculateTime(3500));
                 break;
             case 4:
@@ -62,13 +66,18 @@ public:
                 break;
             case 7:
                 if (InstanceScript* instance = _owner.GetInstanceScript())
+                {
                     instance->SetData(DATA_BATTERED_HILT, 7);
-                _owner.AI()->Talk(SAY_BATTERED_HILT_PREPARE);
+                }
+                if (Creature* quel = _owner.FindNearestCreature(NPC_QUEL_DELAR, 50))
+                {
+                    quel->AI()->Talk(EMOTE_QUEL_PREPARE);
+                }
                 _owner.m_Events.AddEvent(new UtherBatteredHiltEvent(_owner, 8), _owner.m_Events.CalculateTime(4000));
                 break;
             case 8:
                 _owner.SetReactState(REACT_AGGRESSIVE);
-                _owner.RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PC | UNIT_FLAG_IMMUNE_TO_NPC);
+                _owner.SetImmuneToAll(false);
                 if (InstanceScript* instance = _owner.GetInstanceScript())
                     instance->SetData(DATA_BATTERED_HILT, 8);
                 break;
@@ -96,7 +105,7 @@ public:
                 {
                     Position homePos = _owner.GetHomePosition();
                     _owner.SetReactState(REACT_PASSIVE);
-                    _owner.SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PC | UNIT_FLAG_IMMUNE_TO_NPC);
+                    _owner.SetImmuneToAll(true);
                     _owner.SetVisible(false);
                     _owner.UpdatePosition(homePos.GetPositionX(), homePos.GetPositionY(), homePos.GetPositionZ(), homePos.GetOrientation(), true);
                     _owner.StopMovingOnCurrentPos();
@@ -126,7 +135,10 @@ public:
 
     struct instance_halls_of_reflection_InstanceMapScript : public InstanceScript
     {
-        instance_halls_of_reflection_InstanceMapScript(Map* pMap) : InstanceScript(pMap) {};
+        instance_halls_of_reflection_InstanceMapScript(Map* pMap) : InstanceScript(pMap)
+        {
+            SetHeaders(DataHeader);
+        };
 
         uint32 EncounterMask;
         TeamId TeamIdInInstance;
@@ -221,7 +233,7 @@ public:
                     NPC_LeaderIntroGUID = creature->GetGUID();
                     if (TeamIdInInstance == TEAM_ALLIANCE)
                         creature->UpdateEntry(NPC_JAINA_PART1);
-                    creature->RemoveFlag(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_GOSSIP | UNIT_NPC_FLAG_QUESTGIVER);
+                    creature->RemoveNpcFlag(UNIT_NPC_FLAG_GOSSIP | UNIT_NPC_FLAG_QUESTGIVER);
                     creature->RemoveUnitMovementFlag(MOVEMENTFLAG_WALKING);
                     break;
                 case NPC_DARK_RANGER_LORALEN:
@@ -313,7 +325,7 @@ public:
                     if (!(EncounterMask & (1 << DATA_LK_INTRO)))
                     {
                         creature->SetUInt32Value(UNIT_NPC_EMOTESTATE, TeamIdInInstance == TEAM_ALLIANCE ? EMOTE_ONESHOT_ATTACK2HTIGHT : EMOTE_ONESHOT_ATTACK1H);
-                        creature->RemoveFlag(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_GOSSIP | UNIT_NPC_FLAG_QUESTGIVER);
+                        creature->RemoveNpcFlag(UNIT_NPC_FLAG_GOSSIP | UNIT_NPC_FLAG_QUESTGIVER);
                         creature->CastSpell(creature, TeamIdInInstance == TEAM_ALLIANCE ? SPELL_JAINA_ICE_BARRIER : SPELL_SYLVANAS_CLOAK_OF_DARKNESS, true);
                         if (TeamIdInInstance != TEAM_ALLIANCE)
                         {
@@ -323,8 +335,8 @@ public:
                     }
                     else if (!(EncounterMask & (1 << DATA_LICH_KING)))
                     {
-                        creature->RemoveFlag(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_QUESTGIVER);
-                        creature->SetFlag(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_GOSSIP);
+                        creature->RemoveNpcFlag(UNIT_NPC_FLAG_QUESTGIVER);
+                        creature->SetNpcFlag(UNIT_NPC_FLAG_GOSSIP);
                         creature->UpdatePosition(LeaderEscapePos, true);
                         creature->StopMovingOnCurrentPos();
                     }
@@ -523,15 +535,15 @@ public:
                             if (TeamIdInInstance == TEAM_ALLIANCE)
                                 c->UpdateEntry(NPC_JAINA_PART2);
                         }
-                        c->DeleteThreatList();
+                        c->GetThreatMgr().ClearAllThreat();
                         c->CombatStop(true);
                         c->InterruptNonMeleeSpells(true);
                         c->GetMotionMaster()->Clear();
                         c->GetMotionMaster()->MoveIdle();
                         c->UpdatePosition(LeaderEscapePos, true);
                         c->StopMovingOnCurrentPos();
-                        c->RemoveFlag(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_QUESTGIVER);
-                        c->SetFlag(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_GOSSIP);
+                        c->RemoveNpcFlag(UNIT_NPC_FLAG_QUESTGIVER);
+                        c->SetNpcFlag(UNIT_NPC_FLAG_GOSSIP);
                         c->SetHealth(c->GetMaxHealth() / 20);
                         c->AI()->Reset();
                         c->setActive(false);
@@ -540,7 +552,7 @@ public:
                     }
                     if (Creature* c = instance->GetCreature(NPC_LichKingGUID))
                     {
-                        c->DeleteThreatList();
+                        c->GetThreatMgr().ClearAllThreat();
                         c->CombatStop(true);
                         c->InterruptNonMeleeSpells(true);
                         c->GetMotionMaster()->Clear();
@@ -603,8 +615,7 @@ public:
                                 BatteredHiltStatus |= BHSF_THROWN;
                                 if (Creature* c = instance->GetCreature(NPC_UtherGUID))
                                 {
-                                    c->AI()->Talk(SAY_BATTERED_HILT_LEAP);
-                                    c->m_Events.AddEvent(new UtherBatteredHiltEvent(*c, 3), c->m_Events.CalculateTime(1500));
+                                    c->m_Events.AddEvent(new UtherBatteredHiltEvent(*c, 3), c->m_Events.CalculateTime(5500));
                                 }
                                 break;
                             case 4:
@@ -629,7 +640,7 @@ public:
                                 if (Creature* c = instance->GetCreature(NPC_QuelDelarGUID))
                                 {
                                     c->SetReactState(REACT_AGGRESSIVE);
-                                    c->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PC | UNIT_FLAG_IMMUNE_TO_NPC);
+                                    c->SetImmuneToAll(false);
                                     c->RemoveAurasDueToSpell(70300);
                                 }
                                 break;
@@ -705,42 +716,15 @@ public:
             return ObjectGuid::Empty;
         }
 
-        std::string GetSaveData() override
+        void ReadSaveDataMore(std::istringstream& data) override
         {
-            OUT_SAVE_INST_DATA;
-
-            std::ostringstream saveStream;
-            saveStream << "H R " << EncounterMask;
-
-            OUT_SAVE_INST_DATA_COMPLETE;
-            return saveStream.str();
+            data >> EncounterMask;
+            BatteredHiltStatus = (EncounterMask & (1 << DATA_BATTERED_HILT)) ? BHSF_FINISHED : BHSF_NONE;
         }
 
-        void Load(const char* in) override
+        void WriteSaveDataMore(std::ostringstream& data) override
         {
-            if (!in)
-            {
-                OUT_LOAD_INST_DATA_FAIL;
-                return;
-            }
-
-            OUT_LOAD_INST_DATA(in);
-
-            char dataHead1, dataHead2;
-            uint32 data0;
-
-            std::istringstream loadStream(in);
-            loadStream >> dataHead1 >> dataHead2 >> data0;
-
-            if (dataHead1 == 'H' && dataHead2 == 'R')
-            {
-                EncounterMask = data0;
-                BatteredHiltStatus = (EncounterMask & (1 << DATA_BATTERED_HILT)) ? BHSF_FINISHED : BHSF_NONE;
-            }
-            else
-                OUT_LOAD_INST_DATA_FAIL;
-
-            OUT_LOAD_INST_DATA_COMPLETE;
+            data << EncounterMask;
         }
 
         void OnUnitDeath(Unit* unit) override
@@ -889,7 +873,8 @@ public:
                                 if (c->GetEntry() == entry)
                                 {
                                     TrashActive[j] = true;
-                                    c->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PC | UNIT_FLAG_IMMUNE_TO_NPC | UNIT_FLAG_NOT_SELECTABLE);
+                                    c->RemoveUnitFlag(UNIT_FLAG_NOT_SELECTABLE);
+                                    c->SetImmuneToAll(false);
                                     c->AI()->DoAction(1);
                                     break;
                                 }
@@ -915,10 +900,11 @@ public:
                 if (TrashActive[i])
                     if (Creature* c = instance->GetCreature(NPC_TrashGUID[i]))
                     {
-                        c->DeleteThreatList();
+                        c->GetThreatMgr().ClearAllThreat();
                         c->CombatStop(true);
                         c->InterruptNonMeleeSpells(true);
-                        c->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PC | UNIT_FLAG_IMMUNE_TO_NPC | UNIT_FLAG_NOT_SELECTABLE);
+                        c->SetUnitFlag(UNIT_FLAG_NOT_SELECTABLE);
+                        c->SetImmuneToAll(true);
                         c->Respawn(true);
                         c->UpdatePosition(c->GetHomePosition(), true);
                         c->StopMovingOnCurrentPos();
@@ -1002,7 +988,7 @@ public:
             {
                 if (ResumeFirstEventTimer <= diff)
                 {
-                    switch (ResumeFirstEventStep)
+                    switch (ResumeFirstEventStep) // After a wipe
                     {
                         case 0:
                             if (Creature* pFalric = instance->GetCreature(NPC_FalricGUID))
@@ -1029,14 +1015,27 @@ public:
                                         a->SetDuration(8000);
                                 }
 
-                                pMarwyn->TextEmote("Spirits appear and surround the altar!", nullptr, true);
+                                pMarwyn->AI()->Talk(EMOTE_MARWYN_INTRO_SPIRIT);
                             }
                             ++ResumeFirstEventStep;
                             ResumeFirstEventTimer = 7500;
                             break;
                         case 1:
                             if (Creature* pFalric = instance->GetCreature(NPC_FalricGUID))
-                                pFalric->AI()->Talk(SAY_FALRIC_INTRO_2);
+                            {
+                                if (pFalric->IsAlive())
+                                {
+                                    pFalric->AI()->Talk(SAY_FALRIC_INTRO_2); // Between wave 1 and 4
+                                }
+                                else
+                                {
+                                    if (Creature* marwyn = instance->GetCreature(NPC_MarwynGUID))
+                                    {
+                                        marwyn->AI()->Talk(SAY_MARWYN_WIPE_AFTER_FALRIC); // Between wave 6 and 9
+                                    }
+                                }
+                            }
+
                             SetData(ACTION_SHOW_TRASH, 1);
                             ResumeFirstEventStep = 0;
                             ResumeFirstEventTimer = 0;
@@ -1126,7 +1125,7 @@ public:
                             if (Creature* c = instance->GetCreature(NPC_LichKingGUID))
                             {
                                 c->SetUInt32Value(UNIT_NPC_EMOTESTATE, EMOTE_ONESHOT_NONE);
-                                c->DeleteThreatList();
+                                c->GetThreatMgr().ClearAllThreat();
                                 c->CombatStop(true);
                                 c->InterruptNonMeleeSpells(true);
                                 c->SetVisible(false);
@@ -1153,7 +1152,7 @@ public:
                                 for (uint8 i = 0; i < 3; ++i)
                                     if (StairsPos[index][i].GetPositionX())
                                         if (GameObject* go = leader->SummonGameObject(TeamIdInInstance == TEAM_ALLIANCE ? GO_STAIRS_ALLIANCE : GO_STAIRS_HORDE, StairsPos[index][i].GetPositionX(), StairsPos[index][i].GetPositionY(), StairsPos[index][i].GetPositionZ(), StairsPos[index][i].GetOrientation(), 0.0f, 0.0f, 0.0f, 0.0f, 86400, false))
-                                            go->SetFlag(GAMEOBJECT_FLAGS, GO_FLAG_INTERACT_COND | GO_FLAG_NOT_SELECTABLE);
+                                            go->SetGameObjectFlag(GO_FLAG_INTERACT_COND | GO_FLAG_NOT_SELECTABLE);
 
                                 //Position pos = TeamIdInInstance == TEAM_ALLIANCE ? AllyPortalPos : HordePortalPos;
                                 //leader->SummonGameObject(GO_PORTAL_TO_DALARAN, pos.GetPositionX(), pos.GetPositionY(), pos.GetPositionZ(), pos.GetOrientation(), 0.0f, 0.0f, 0.0f, 0.0f, 86400);
@@ -1176,7 +1175,7 @@ public:
                             break;
                         case 9:
                             if (Creature* c = instance->GetCreature(NPC_LeaderGUID))
-                                c->AI()->Talk(TeamIdInInstance == TEAM_ALLIANCE ? SAY_FINAL_ALLY : SAY_FINAL_HORDE);
+                                c->AI()->Talk(TeamIdInInstance == TEAM_ALLIANCE ? SAY_JAINA_FINAL_1 : SAY_SYLVANA_FINAL);
                             HandleGameObject(GO_CaveInGUID, true);
                             ++outroStep;
                             outroTimer = 11000;
@@ -1190,13 +1189,13 @@ public:
                             if (TeamIdInInstance == TEAM_ALLIANCE)
                                 if (Creature* c = instance->GetCreature(NPC_LeaderGUID))
                                 {
-                                    c->AI()->Talk(SAY_FINAL_ALLY_SECOND);
+                                    c->AI()->Talk(SAY_JAINA_FINAL_2);
                                     outroTimer = 10000;
                                 }
                             break;
                         case 11:
                             if (Creature* c = instance->GetCreature(NPC_LeaderGUID))
-                                c->SetFlag(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_QUESTGIVER);
+                                c->SetNpcFlag(UNIT_NPC_FLAG_QUESTGIVER);
                             ++outroStep;
                             outroTimer = 300 * 1000;
                             break;

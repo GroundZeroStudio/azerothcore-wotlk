@@ -82,13 +82,13 @@ public:
         {
             BossAI::Reset();
             me->SetReactState(REACT_AGGRESSIVE);
-            me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
+            me->RemoveUnitFlag(UNIT_FLAG_NOT_SELECTABLE);
             me->SetVisible(true);
         }
 
-        void EnterCombat(Unit* who) override
+        void JustEngagedWith(Unit* who) override
         {
-            BossAI::EnterCombat(who);
+            BossAI::JustEngagedWith(who);
             me->CastSpell(me, SPELL_NEGATIVE_ENERGY, true);
             me->CastSpell(me, SPELL_SUMMON_BLOOD_ELVES_PERIODIC, true);
             me->CastSpell(me, SPELL_OPEN_PORTAL_PERIODIC, true);
@@ -102,9 +102,9 @@ public:
             if (damage >= me->GetHealth())
             {
                 damage = 0;
-                if (!me->HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE))
+                if (!me->HasUnitFlag(UNIT_FLAG_NOT_SELECTABLE))
                 {
-                    me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
+                    me->SetUnitFlag(UNIT_FLAG_NOT_SELECTABLE);
                     me->RemoveAllAuras();
                     me->CastSpell(me, SPELL_OPEN_ALL_PORTALS, true);
                     events.ScheduleEvent(EVENT_SUMMON_ENTROPIUS, 7000);
@@ -176,17 +176,17 @@ public:
             me->SetReactState(REACT_PASSIVE);
         }
 
-        void EnterEvadeMode() override
+        void EnterEvadeMode(EvadeReason why) override
         {
             if (InstanceScript* instance = me->GetInstanceScript())
                 if (Creature* muru = ObjectAccessor::GetCreature(*me, instance->GetGuidData(NPC_MURU)))
                     if (!muru->IsInEvadeMode())
-                        muru->AI()->EnterEvadeMode();
+                        muru->AI()->EnterEvadeMode(why);
 
             me->DespawnOrUnsummon();
         }
 
-        void EnterCombat(Unit* /*who*/) override
+        void JustEngagedWith(Unit* /*who*/) override
         {
             events.ScheduleEvent(EVENT_SPAWN_BLACK_HOLE, 15000);
             events.ScheduleEvent(EVENT_SPAWN_DARKNESS, 10000);
@@ -299,7 +299,7 @@ public:
             switch (events.ExecuteEvent())
             {
                 case EVENT_SINGULARITY_DEATH:
-                    Unit::Kill(me, me);
+                    me->KillSelf();
                     break;
                 case EVENT_START_BLACK_HOLE:
                     me->RemoveAurasDueToSpell(SPELL_BLACK_HOLE_SUMMON_VISUAL2);

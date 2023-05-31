@@ -111,7 +111,7 @@ public:
             me->SetPower(POWER_MANA, 0);
         }
 
-        void EnterCombat(Unit* /*who*/) override
+        void JustEngagedWith(Unit* /*who*/) override
         {
             Talk(SAY_AGGRO);
             instance->SetData(DATA_SELIN_EVENT, IN_PROGRESS);
@@ -167,7 +167,7 @@ public:
                 if (Unit* crystal = ObjectAccessor::GetUnit(*me, CrystalGUID))
                 {
                     Talk(EMOTE_CRYSTAL);
-                    crystal->SetUInt32Value(UNIT_FIELD_FLAGS, 0);
+                    crystal->ReplaceAllUnitFlags(UNIT_FLAG_NONE);
                     crystal->CastSpell(me, SPELL_MANA_RAGE, true);
                     me->CastSpell(crystal, SPELL_FEL_CRYSTAL_COSMETIC, true);
                     events.SetPhase(1);

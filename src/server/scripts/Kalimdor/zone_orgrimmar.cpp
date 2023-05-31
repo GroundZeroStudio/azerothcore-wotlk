@@ -81,7 +81,7 @@ public:
             PlayerGUID.Clear();
         }
 
-        void EnterCombat(Unit* /*who*/) override { }
+        void JustEngagedWith(Unit* /*who*/) override { }
 
         void UpdateAI(uint32 diff) override
         {
@@ -252,13 +252,13 @@ public:
             ShockTimer = 8000;
         }
 
-        void EnterCombat(Unit* /*who*/) override { }
+        void JustEngagedWith(Unit* /*who*/) override { }
 
         void DoAction(int32 action) override
         {
             if (action == ACTION_START_TALKING)
             {
-                me->RemoveFlag(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_GOSSIP);
+                me->RemoveNpcFlag(UNIT_NPC_FLAG_GOSSIP);
                 me->GetMap()->LoadGrid(heraldOfThrallPos.GetPositionX(), heraldOfThrallPos.GetPositionY());
                 me->SummonCreature(NPC_HERALD_OF_THRALL, heraldOfThrallPos, TEMPSUMMON_TIMED_DESPAWN, 20 * IN_MILLISECONDS);
                 _scheduler.Schedule(2s, [this](TaskContext /*context*/)
@@ -272,7 +272,7 @@ public:
                 .Schedule(15s, [this](TaskContext /*context*/)
                     {
                         DoCastAOE(SPELL_WARCHIEF_BLESSING, true);
-                        me->SetFlag(UNIT_NPC_FLAGS, UNIT_NPC_FLAG_GOSSIP);
+                        me->SetNpcFlag(UNIT_NPC_FLAG_GOSSIP);
                         me->GetMap()->DoForAllPlayers([&](Player* p)
                             {
                                 if (p->IsAlive() && !p->IsGameMaster())

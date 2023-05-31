@@ -27,6 +27,7 @@
 #include "GroupMgr.h"
 #include "Map.h"
 #include "MapMgr.h"
+#include "MiscPackets.h"
 #include "ObjectAccessor.h"
 #include "ObjectMgr.h"
 #include "Transport.h"
@@ -86,7 +87,7 @@ void Battlefield::HandlePlayerEnterZone(Player* player, uint32 /*zone*/)
                 InvitePlayerToWar(player);
             else // No more vacant places
             {
-                // TODO: Send a packet to announce it to player
+                /// @todo: Send a packet to announce it to player
                 m_PlayersWillBeKick[player->GetTeamId()][player->GetGUID()] = GameTime::GetGameTime().count() + (player->IsGameMaster() ? 30 * MINUTE : 10);
                 InvitePlayerToQueue(player);
             }
@@ -231,7 +232,7 @@ void Battlefield::InvitePlayerToQueue(Player* player)
 
 void Battlefield::InvitePlayersInQueueToWar()
 {
-    for (uint8 team = 0; team < BG_TEAMS_COUNT; ++team)
+    for (uint8 team = 0; team < PVP_TEAMS_COUNT; ++team)
     {
         GuidUnorderedSet copy(m_PlayersInQueue[team]);
         for (GuidUnorderedSet::const_iterator itr = copy.begin(); itr != copy.end(); ++itr)
@@ -252,7 +253,7 @@ void Battlefield::InvitePlayersInQueueToWar()
 
 void Battlefield::InvitePlayersInZoneToWar()
 {
-    for (uint8 team = 0; team < BG_TEAMS_COUNT; ++team)
+    for (uint8 team = 0; team < PVP_TEAMS_COUNT; ++team)
         for (GuidUnorderedSet::const_iterator itr = m_players[team].begin(); itr != m_players[team].end(); ++itr)
         {
             if (Player* player = ObjectAccessor::FindPlayer(*itr))
@@ -272,7 +273,7 @@ void Battlefield::InvitePlayerToWar(Player* player)
     if (!player)
         return;
 
-    // TODO : needed ?
+    /// @todo : needed ?
     if (player->IsInFlight())
         return;
 
@@ -283,7 +284,7 @@ void Battlefield::InvitePlayerToWar(Player* player)
     }
 
     // If the player does not match minimal level requirements for the battlefield, kick him
-    if (player->getLevel() < m_MinLevel)
+    if (player->GetLevel() < m_MinLevel)
     {
         if (m_PlayersWillBeKick[player->GetTeamId()].count(player->GetGUID()) == 0)
             m_PlayersWillBeKick[player->GetTeamId()][player->GetGUID()] = GameTime::GetGameTime().count() + 10;
@@ -310,7 +311,7 @@ void Battlefield::InitStalker(uint32 entry, float x, float y, float z, float o)
 void Battlefield::KickAfkPlayers()
 {
     // xinef: optimization, dont lookup player twice
-    for (uint8 team = 0; team < BG_TEAMS_COUNT; ++team)
+    for (uint8 team = 0; team < PVP_TEAMS_COUNT; ++team)
         for (GuidUnorderedSet::const_iterator itr = m_PlayersInWar[team].begin(); itr != m_PlayersInWar[team].end(); ++itr)
             if (Player* player = ObjectAccessor::FindPlayer(*itr))
                 if (player->isAFK() && player->GetZoneId() == GetZoneId() && !player->IsGameMaster())
@@ -331,7 +332,7 @@ void Battlefield::StartBattle()
     if (m_isActive)
         return;
 
-    for (int team = 0; team < BG_TEAMS_COUNT; team++)
+    for (int team = 0; team < PVP_TEAMS_COUNT; team++)
     {
         m_PlayersInWar[team].clear();
         m_Groups[team].clear();
@@ -374,14 +375,7 @@ void Battlefield::EndBattle(bool endByTimer)
 
 void Battlefield::DoPlaySoundToAll(uint32 SoundID)
 {
-    WorldPacket data;
-    data.Initialize(SMSG_PLAY_SOUND, 4);
-    data << uint32(SoundID);
-
-    for (int team = 0; team < BG_TEAMS_COUNT; team++)
-        for (GuidUnorderedSet::const_iterator itr = m_PlayersInWar[team].begin(); itr != m_PlayersInWar[team].end(); ++itr)
-            if (Player* player = ObjectAccessor::FindPlayer(*itr))
-                player->GetSession()->SendPacket(&data);
+    BroadcastPacketToWar(WorldPackets::Misc::Playsound(SoundID).Write());
 }
 
 bool Battlefield::HasPlayer(Player* player) const
@@ -447,47 +441,39 @@ void Battlefield::TeamCastSpell(TeamId team, int32 spellId)
     }
 }
 
-void Battlefield::BroadcastPacketToZone(WorldPacket& data) const
+void Battlefield::BroadcastPacketToZone(WorldPacket const* data) const
 {
-    for (uint8 team = 0; team < BG_TEAMS_COUNT; ++team)
+    for (uint8 team = 0; team < PVP_TEAMS_COUNT; ++team)
         for (GuidUnorderedSet::const_iterator itr = m_players[team].begin(); itr != m_players[team].end(); ++itr)
             if (Player* player = ObjectAccessor::FindPlayer(*itr))
-                player->GetSession()->SendPacket(&data);
+                player->GetSession()->SendPacket(data);
 }
 
-void Battlefield::BroadcastPacketToQueue(WorldPacket& data) const
+void Battlefield::BroadcastPacketToQueue(WorldPacket const* data) const
 {
-    for (uint8 team = 0; team < BG_TEAMS_COUNT; ++team)
+    for (uint8 team = 0; team < PVP_TEAMS_COUNT; ++team)
         for (GuidUnorderedSet::const_iterator itr = m_PlayersInQueue[team].begin(); itr != m_PlayersInQueue[team].end(); ++itr)
             if (Player* player = ObjectAccessor::FindPlayer(*itr))
-                player->GetSession()->SendPacket(&data);
+                player->GetSession()->SendPacket(data);
 }
 
-void Battlefield::BroadcastPacketToWar(WorldPacket& data) const
+void Battlefield::BroadcastPacketToWar(WorldPacket const* data) const
 {
-    for (uint8 team = 0; team < BG_TEAMS_COUNT; ++team)
+    for (uint8 team = 0; team < PVP_TEAMS_COUNT; ++team)
         for (GuidUnorderedSet::const_iterator itr = m_PlayersInWar[team].begin(); itr != m_PlayersInWar[team].end(); ++itr)
             if (Player* player = ObjectAccessor::FindPlayer(*itr))
-                player->GetSession()->SendPacket(&data);
+                player->GetSession()->SendPacket(data);
 }
 
-void Battlefield::SendWarningToAllInZone(uint32 entry)
+void Battlefield::SendWarning(uint8 id, WorldObject const* target /*= nullptr*/)
 {
     if (Creature* stalker = GetCreature(StalkerGuid))
-        sCreatureTextMgr->SendChat(stalker, (uint8)entry, nullptr, CHAT_MSG_ADDON, LANG_ADDON, TEXT_RANGE_ZONE);
-}
-
-void Battlefield::SendWarningToPlayer(Player* player, uint32 entry)
-{
-    if (player)
-        if (Unit* unit = ObjectAccessor::GetCreature(*player, StalkerGuid))
-            if (Creature* stalker = unit->ToCreature())
-                sCreatureTextMgr->SendChat(stalker, (uint8)entry, player);
+        sCreatureTextMgr->SendChat(stalker, id, target);
 }
 
 void Battlefield::SendUpdateWorldState(uint32 field, uint32 value)
 {
-    for (uint8 i = 0; i < BG_TEAMS_COUNT; ++i)
+    for (uint8 i = 0; i < PVP_TEAMS_COUNT; ++i)
         for (GuidUnorderedSet::iterator itr = m_players[i].begin(); itr != m_players[i].end(); ++itr)
             if (Player* player = ObjectAccessor::FindPlayer(*itr))
                 player->SendUpdateWorldState(field, value);
@@ -502,7 +488,7 @@ void Battlefield::HideNpc(Creature* creature)
 {
     creature->CombatStop();
     creature->SetReactState(REACT_PASSIVE);
-    creature->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_NOT_SELECTABLE);
+    creature->SetUnitFlag(UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_NOT_SELECTABLE);
     creature->SetPhaseMask(2, false); // pussywizard: false because UpdateObjectVisibility(true) is called below in SetVisible(), no need to have it here
     creature->DisappearAndDie();
     creature->SetVisible(false);
@@ -512,14 +498,14 @@ void Battlefield::ShowNpc(Creature* creature, bool aggressive)
 {
     creature->SetPhaseMask(1, false); // pussywizard: false because UpdateObjectVisibility(true) is called below in SetVisible(), no need to have it here
     creature->SetVisible(true);
-    creature->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_NOT_SELECTABLE);
+    creature->RemoveUnitFlag(UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_NOT_SELECTABLE);
     if (!creature->IsAlive())
         creature->Respawn(true);
     if (aggressive)
         creature->SetReactState(REACT_AGGRESSIVE);
     else
     {
-        creature->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
+        creature->SetUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
         creature->SetReactState(REACT_PASSIVE);
     }
 }
@@ -931,10 +917,13 @@ void BfCapturePoint::SendChangePhase()
             }
 }
 
-bool BfCapturePoint::SetCapturePointData(GameObject* capturePoint)
+bool BfCapturePoint::SetCapturePointData(GameObject* capturePoint, TeamId team)
 {
     ASSERT(capturePoint);
 
+    //At first call using TEAM_NEUTRAL as a checker but never using it, after first call we reset the capturepoints to the new winner of the last WG war
+    if (team == TEAM_NEUTRAL)
+        team = m_team;
     LOG_DEBUG("bg.battlefield", "Creating capture point {}", capturePoint->GetEntry());
 
     m_capturePoint = capturePoint->GetGUID();
@@ -953,7 +942,7 @@ bool BfCapturePoint::SetCapturePointData(GameObject* capturePoint)
     m_neutralValuePct = goinfo->capturePoint.neutralPercent;
     m_minValue = m_maxValue * goinfo->capturePoint.neutralPercent / 100;
     m_capturePointEntry = capturePoint->GetEntry();
-    if (m_team == TEAM_ALLIANCE)
+    if (team == TEAM_ALLIANCE)
     {
         m_value = m_maxValue;
         m_State = BF_CAPTUREPOINT_OBJECTIVESTATE_ALLIANCE;

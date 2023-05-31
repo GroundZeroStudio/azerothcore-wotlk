@@ -71,6 +71,12 @@ namespace lfg
 
 namespace WorldPackets
 {
+    namespace LFG
+    {
+        class LFGJoin;
+        class LFGLeave;
+    }
+
     namespace Chat
     {
         class EmoteClient;
@@ -96,6 +102,11 @@ namespace WorldPackets
         class AutoBankItem;
         class AutoStoreBankItem;
         class BuyBankSlot;
+    }
+
+    namespace Combat
+    {
+        class SetSheathed;
     }
 
     namespace Guild
@@ -138,6 +149,15 @@ namespace WorldPackets
     namespace Misc
     {
         class RandomRollClient;
+    }
+
+    namespace Pet
+    {
+        class DismissCritter;
+        class PetAbandon;
+        class PetStopAttack;
+        class PetSpellAutocast;
+        class RequestPetInfo;
     }
 }
 
@@ -314,6 +334,7 @@ public:
 
     bool PlayerLoading() const { return m_playerLoading; }
     bool PlayerLogout() const { return m_playerLogout; }
+    bool PlayerRecentlyLoggedOut() const { return m_playerRecentlyLogout; }
     bool PlayerLogoutWithSave() const { return m_playerLogout && m_playerSave; }
 
     void ReadAddonsInfo(ByteBuffer& data);
@@ -354,6 +375,7 @@ public:
     uint32 GetTotalTime() const { return m_total_time; }
 
     void InitWarden(SessionKey const&, std::string const& os);
+    Warden* GetWarden();
 
     /// Session in auth.queue currently
     void SetInQueue(bool state) { m_inQueue = state; }
@@ -427,10 +449,9 @@ public:
     AccountData* GetAccountData(AccountDataType type) { return &m_accountData[type]; }
     void SetAccountData(AccountDataType type, time_t tm, std::string const& data);
     void SendAccountDataTimes(uint32 mask);
-    void LoadGlobalAccountData();
     void LoadAccountData(PreparedQueryResult result, uint32 mask);
 
-    void LoadTutorialsData();
+    void LoadTutorialsData(PreparedQueryResult result);
     void SendTutorialsData();
     void SaveTutorialsData(CharacterDatabaseTransaction trans);
     uint32 GetTutorialInt(uint8 index) const { return m_Tutorials[index]; }
@@ -779,7 +800,7 @@ public:                                                 // opcodes handlers
 
     void HandleAttackSwingOpcode(WorldPacket& recvPacket);
     void HandleAttackStopOpcode(WorldPacket& recvPacket);
-    void HandleSetSheathedOpcode(WorldPacket& recvPacket);
+    void HandleSetSheathedOpcode(WorldPackets::Combat::SetSheathed& packet);
 
     void HandleUseItemOpcode(WorldPacket& recvPacket);
     void HandleOpenItemOpcode(WorldPacket& recvPacket);
@@ -858,14 +879,14 @@ public:                                                 // opcodes handlers
 
     //Pet
     void HandlePetAction(WorldPacket& recvData);
-    void HandlePetStopAttack(WorldPacket& recvData);
+    void HandlePetStopAttack(WorldPackets::Pet::PetStopAttack& packet);
     void HandlePetActionHelper(Unit* pet, ObjectGuid guid1, uint32 spellid, uint16 flag, ObjectGuid guid2);
     void HandlePetNameQuery(WorldPacket& recvData);
     void HandlePetSetAction(WorldPacket& recvData);
-    void HandlePetAbandon(WorldPacket& recvData);
+    void HandlePetAbandon(WorldPackets::Pet::PetAbandon& packet);
     void HandlePetRename(WorldPacket& recvData);
     void HandlePetCancelAuraOpcode(WorldPacket& recvPacket);
-    void HandlePetSpellAutocastOpcode(WorldPacket& recvPacket);
+    void HandlePetSpellAutocastOpcode(WorldPackets::Pet::PetSpellAutocast& packet);
     void HandlePetCastSpellOpcode(WorldPacket& recvPacket);
     void HandlePetLearnTalent(WorldPacket& recvPacket);
     void HandleLearnPreviewTalentsPet(WorldPacket& recvPacket);
@@ -877,7 +898,7 @@ public:                                                 // opcodes handlers
     void HandleSetPlayerDeclinedNames(WorldPacket& recvData);
 
     void HandleTotemDestroyed(WorldPackets::Totem::TotemDestroyed& totemDestroyed);
-    void HandleDismissCritter(WorldPacket& recvData);
+    void HandleDismissCritter(WorldPackets::Pet::DismissCritter& dismissCritter);
 
     //Battleground
     void HandleBattlemasterHelloOpcode(WorldPacket& recvData);
@@ -921,8 +942,8 @@ public:                                                 // opcodes handlers
     void HandleLfgSetCommentOpcode(WorldPacket& recvData);
     void HandleLfgPlayerLockInfoRequestOpcode(WorldPacket& recvData);
     void HandleLfgPartyLockInfoRequestOpcode(WorldPacket& recvData);
-    void HandleLfgJoinOpcode(WorldPacket& recvData);
-    void HandleLfgLeaveOpcode(WorldPacket& recvData);
+    void HandleLfgJoinOpcode(WorldPackets::LFG::LFGJoin& lfgJoin);
+    void HandleLfgLeaveOpcode(WorldPackets::LFG::LFGLeave& lfgleave);
     void HandleLfgSetRolesOpcode(WorldPacket& recvData);
     void HandleLfgProposalResultOpcode(WorldPacket& recvData);
     void HandleLfgSetBootVoteOpcode(WorldPacket& recvData);
@@ -962,7 +983,7 @@ public:                                                 // opcodes handlers
     void HandleCancelMountAuraOpcode(WorldPacket& recvData);
     void HandleSelfResOpcode(WorldPacket& recvData);
     void HandleComplainOpcode(WorldPacket& recvData);
-    void HandleRequestPetInfoOpcode(WorldPacket& recvData);
+    void HandleRequestPetInfo(WorldPackets::Pet::RequestPetInfo& packet);
 
     // Socket gem
     void HandleSocketOpcode(WorldPacket& recvData);
@@ -1045,8 +1066,6 @@ public:                                                 // opcodes handlers
     uint32 GetOfflineTime() const { return _offlineTime; }
     bool IsKicked() const { return _kicked; }
     void SetKicked(bool val) { _kicked = val; }
-    void SetShouldSetOfflineInDB(bool val) { _shouldSetOfflineInDB = val; }
-    bool GetShouldSetOfflineInDB() const { return _shouldSetOfflineInDB; }
     bool IsSocketClosed() const;
 
     /*
@@ -1056,6 +1075,9 @@ public:                                                 // opcodes handlers
     QueryCallbackProcessor& GetQueryProcessor() { return _queryProcessor; }
     TransactionCallback& AddTransactionCallback(TransactionCallback&& callback);
     SQLQueryHolderCallback& AddQueryHolderCallback(SQLQueryHolderCallback&& callback);
+
+    void InitializeSession();
+    void InitializeSessionCallback(CharacterDatabaseQueryHolder const& realmHolder, uint32 clientCacheVersion);
 
 private:
     void ProcessQueryCallbacks();
@@ -1116,7 +1138,7 @@ private:
     // characters who failed on Player::BuildEnumData shouldn't login
     GuidSet _legitCharacters;
 
-    ObjectGuid::LowType m_GUIDLow;
+    ObjectGuid::LowType m_GUIDLow;                     // set logined or recently logout player (while m_playerRecentlyLogout set)
     Player* _player;
     std::shared_ptr<WorldSocket> m_Socket;
     std::string m_Address;
@@ -1137,6 +1159,7 @@ private:
     bool m_inQueue;                                     // session wait in auth.queue
     bool m_playerLoading;                               // code processed in LoginPlayer
     bool m_playerLogout;                                // code processed in LogoutPlayer
+    bool m_playerRecentlyLogout;
     bool m_playerSave;
     LocaleConstant m_sessionDbcLocale;
     LocaleConstant m_sessionDbLocaleIndex;
@@ -1152,9 +1175,11 @@ private:
     ObjectGuid m_currentBankerGUID;
     uint32 _offlineTime;
     bool _kicked;
-    bool _shouldSetOfflineInDB;
     // Packets cooldown
     time_t _calendarEventCreationCooldown;
+
+    // Addon Message count for Metric
+    std::atomic<uint32> _addonMessageReceiveCount;
 
     CircularBuffer<std::pair<int64, uint32>> _timeSyncClockDeltaQueue; // first member: clockDelta. Second member: latency of the packet exchange that was used to compute that clockDelta.
     int64 _timeSyncClockDelta;

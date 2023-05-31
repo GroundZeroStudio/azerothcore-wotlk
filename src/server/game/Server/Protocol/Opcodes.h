@@ -507,7 +507,7 @@ enum Opcodes : uint16
     SMSG_PONG                                       = 0x1DD,
     SMSG_CLEAR_COOLDOWN                             = 0x1DE,
     SMSG_GAMEOBJECT_PAGETEXT                        = 0x1DF,
-    CMSG_SETSHEATHED                                = 0x1E0,
+    CMSG_SET_SHEATHED                               = 0x1E0,
     SMSG_COOLDOWN_CHEAT                             = 0x1E1,
     SMSG_SPELL_DELAYED                              = 0x1E2,
     CMSG_QUEST_POI_QUERY                            = 0x1E3,
@@ -1205,7 +1205,7 @@ enum Opcodes : uint16
     CMSG_FLOOD_GRACE_CHEAT                          = 0x497,
     SMSG_SERVER_FIRST_ACHIEVEMENT                   = 0x498,
     SMSG_PET_LEARNED_SPELL                          = 0x499,
-    SMSG_PET_REMOVED_SPELL                          = 0x49A,
+    SMSG_PET_UNLEARNED_SPELL                        = 0x49A,
     CMSG_CHANGE_SEATS_ON_CONTROLLED_VEHICLE         = 0x49B,
     CMSG_HEARTH_AND_RESURRECT                       = 0x49C,
     SMSG_ON_CANCEL_EXPECTED_RIDE_VEHICLE_AURA       = 0x49D,
@@ -1353,9 +1353,10 @@ typedef Opcodes OpcodeServer;
 /// Player state
 enum SessionStatus
 {
-    STATUS_AUTHED = 0,                                      // Player authenticated (_player == nullptr, m_GUID has garbage)
+    STATUS_AUTHED = 0,                                      // Player authenticated (_player == nullptr, m_playerRecentlyLogout = false or will be reset before handler call, m_GUID have garbage)
     STATUS_LOGGEDIN,                                        // Player in game (_player != nullptr, m_GUID == _player->GetGUID(), inWorld())
     STATUS_TRANSFER,                                        // Player transferring to another map (_player != nullptr, m_GUID == _player->GetGUID(), !inWorld())
+    STATUS_LOGGEDIN_OR_RECENTLY_LOGGOUT,                    // _player != nullptr or _player == nullptr && m_playerRecentlyLogout && m_playerLogout, m_GUID store last _player guid)
     STATUS_NEVER,                                           // Opcode not accepted from client (deprecated or server side only)
     STATUS_UNHANDLED,                                       // Opcode not handled yet
 };

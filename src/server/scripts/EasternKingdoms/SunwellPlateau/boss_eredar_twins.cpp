@@ -111,21 +111,21 @@ public:
             }
         }
 
-        void EnterEvadeMode() override
+        void EnterEvadeMode(EvadeReason why) override
         {
-            BossAI::EnterEvadeMode();
+            BossAI::EnterEvadeMode(why);
             if (Creature* alythess = ObjectAccessor::GetCreature(*me, instance->GetGuidData(NPC_GRAND_WARLOCK_ALYTHESS)))
             {
                 if (!alythess->IsAlive())
                     alythess->Respawn(true);
                 else if (!alythess->IsInEvadeMode())
-                    alythess->AI()->EnterEvadeMode();
+                    alythess->AI()->EnterEvadeMode(why);
             }
         }
 
-        void EnterCombat(Unit* who) override
+        void JustEngagedWith(Unit* who) override
         {
-            BossAI::EnterCombat(who);
+            BossAI::JustEngagedWith(who);
             if (Creature* alythess = ObjectAccessor::GetCreature(*me, instance->GetGuidData(NPC_GRAND_WARLOCK_ALYTHESS)))
                 if (alythess->IsAlive() && !alythess->IsInCombat())
                     alythess->AI()->AttackStart(who);
@@ -259,21 +259,21 @@ public:
             }
         }
 
-        void EnterEvadeMode() override
+        void EnterEvadeMode(EvadeReason why) override
         {
-            BossAI::EnterEvadeMode();
+            BossAI::EnterEvadeMode(why);
             if (Creature* scorlash = ObjectAccessor::GetCreature(*me, instance->GetGuidData(NPC_LADY_SACROLASH)))
             {
                 if (!scorlash->IsAlive())
                     scorlash->Respawn(true);
                 else if (!scorlash->IsInEvadeMode())
-                    scorlash->AI()->EnterEvadeMode();
+                    scorlash->AI()->EnterEvadeMode(why);
             }
         }
 
-        void EnterCombat(Unit* who) override
+        void JustEngagedWith(Unit* who) override
         {
-            BossAI::EnterCombat(who);
+            BossAI::JustEngagedWith(who);
             if (Creature* scorlash = ObjectAccessor::GetCreature(*me, instance->GetGuidData(NPC_LADY_SACROLASH)))
                 if (scorlash->IsAlive() && !scorlash->IsInCombat())
                     scorlash->AI()->AttackStart(who);

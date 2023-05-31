@@ -32,7 +32,7 @@ void PointMovementGenerator<T>::DoInitialize(T* unit)
     if (unit->HasUnitState(UNIT_STATE_NOT_MOVE) || unit->IsMovementPreventedByCasting())
     {
         // the next line is to ensure that a new spline is created in DoUpdate() once the unit is no longer rooted/stunned
-        // todo: rename this flag to something more appropriate since it is set to true even without speed change now.
+        /// @todo: rename this flag to something more appropriate since it is set to true even without speed change now.
         i_recalculateSpeed = true;
         return;
     }
@@ -41,7 +41,7 @@ void PointMovementGenerator<T>::DoInitialize(T* unit)
         unit->StopMoving();
 
     unit->AddUnitState(UNIT_STATE_ROAMING | UNIT_STATE_ROAMING_MOVE);
-    if (id == EVENT_CHARGE)
+    if (id == EVENT_CHARGE || id == EVENT_CHARGE_PREPATH)
     {
         unit->AddUnitState(UNIT_STATE_CHARGING);
     }
@@ -117,7 +117,7 @@ bool PointMovementGenerator<T>::DoUpdate(T* unit, uint32 /*diff*/)
 
     unit->AddUnitState(UNIT_STATE_ROAMING_MOVE);
 
-    if (i_recalculateSpeed && !unit->movespline->Finalized())
+    if (id != EVENT_CHARGE_PREPATH && i_recalculateSpeed && !unit->movespline->Finalized())
     {
         i_recalculateSpeed = false;
         Movement::MoveSplineInit init(unit);
@@ -158,13 +158,16 @@ template<class T>
 void PointMovementGenerator<T>::DoFinalize(T* unit)
 {
     unit->ClearUnitState(UNIT_STATE_ROAMING | UNIT_STATE_ROAMING_MOVE);
-    if (id == EVENT_CHARGE)
+    if (id == EVENT_CHARGE || id == EVENT_CHARGE_PREPATH)
     {
         unit->ClearUnitState(UNIT_STATE_CHARGING);
 
-        if (Unit* target = ObjectAccessor::GetUnit(*unit, _chargeTargetGUID))
+        if (_chargeTargetGUID && _chargeTargetGUID == unit->GetTarget())
         {
-            unit->Attack(target, true);
+            if (Unit* target = ObjectAccessor::GetUnit(*unit, _chargeTargetGUID))
+            {
+                unit->Attack(target, true);
+            }
         }
     }
 
@@ -179,7 +182,7 @@ void PointMovementGenerator<T>::DoReset(T* unit)
         unit->StopMoving();
 
     unit->AddUnitState(UNIT_STATE_ROAMING | UNIT_STATE_ROAMING_MOVE);
-    if (id == EVENT_CHARGE)
+    if (id == EVENT_CHARGE || id == EVENT_CHARGE_PREPATH)
     {
         unit->AddUnitState(UNIT_STATE_CHARGING);
     }
@@ -194,6 +197,14 @@ template <> void PointMovementGenerator<Creature>::MovementInform(Creature* unit
 {
     if (unit->AI())
         unit->AI()->MovementInform(POINT_MOTION_TYPE, id);
+
+    if (Unit* summoner = unit->GetCharmerOrOwner())
+    {
+        if (UnitAI* AI = summoner->GetAI())
+        {
+            AI->SummonMovementInform(unit, POINT_MOTION_TYPE, id);
+        }
+    }
 }
 
 template void PointMovementGenerator<Player>::DoInitialize(Player*);

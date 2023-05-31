@@ -70,7 +70,7 @@ public:
             BossAI::InitializeAI();
             if (instance)
                 if (Creature* executioner = ObjectAccessor::GetCreature(*me, instance->GetGuidData(DATA_EXECUTIONER)))
-                    executioner->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
+                    executioner->SetUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
         }
 
         void JustDied(Unit* /*killer*/) override
@@ -80,13 +80,13 @@ public:
 
             if (instance)
                 if (Creature* executioner = ObjectAccessor::GetCreature(*me, instance->GetGuidData(DATA_EXECUTIONER)))
-                    executioner->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
+                    executioner->RemoveUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
         }
 
-        void EnterCombat(Unit*  /*who*/) override
+        void JustEngagedWith(Unit*  /*who*/) override
         {
             Talk(SAY_AGGRO);
-            _EnterCombat();
+            _JustEngagedWith();
 
             events.ScheduleEvent(EVENT_CHECK_ROOM, 5000);
             events.ScheduleEvent(EVENT_SUMMON_ADDS, 30000);

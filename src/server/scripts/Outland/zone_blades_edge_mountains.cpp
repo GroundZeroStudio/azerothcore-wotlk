@@ -39,7 +39,7 @@ EndContentData */
 #include "SpellInfo.h"
 #include "SpellScript.h"
 
-// TODO: this import is not necessary for compilation and marked as unused by the IDE
+/// @todo: this import is not necessary for compilation and marked as unused by the IDE
 //  however, for some reasons removing it would cause a damn linking issue
 //  there is probably some underlying problem with imports which should properly addressed
 //  see: https://github.com/azerothcore/azerothcore-wotlk/issues/9766
@@ -149,7 +149,7 @@ public:
 
             if (Creature* Target = GetClosestCreatureWithEntry(me, NPC_DEATHS_DOOR_FEL_CANNON, 200.0f))
             {
-                Target->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_ATTACKABLE_1); // attack the cannon
+                Target->RemoveUnitFlag(UNIT_FLAG_NOT_ATTACKABLE_1); // attack the cannon
                 summoned->AI()->AttackStart(Target);
             }
         }
@@ -197,7 +197,7 @@ public:
 
         void Reset() override
         {
-            me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_DISABLE_MOVE | UNIT_FLAG_NOT_ATTACKABLE_1);
+            me->SetUnitFlag(UNIT_FLAG_DISABLE_MOVE | UNIT_FLAG_NOT_ATTACKABLE_1);
         }
 
         void UpdateAI(uint32 /*diff*/) override
@@ -306,12 +306,12 @@ public:
             IntangiblePresence_Timer = 15000;
         }
 
-        void EnterCombat(Unit* /*who*/) override { }
+        void JustEngagedWith(Unit* /*who*/) override { }
 
         void MoveInLineOfSight(Unit* who) override
 
         {
-            if (me->HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE))
+            if (me->HasUnitFlag(UNIT_FLAG_NON_ATTACKABLE))
                 return;
 
             ScriptedAI::MoveInLineOfSight(who);
@@ -345,7 +345,7 @@ public:
                 if (me->GetEntry() == ENTRY_NIHIL)
                 {
                     Talk(SAY_NIHIL_INTERRUPT);
-                    me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
+                    me->RemoveUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
                     IsNihil = false;
                 }
 
@@ -354,7 +354,7 @@ public:
                     if (entry_list[cid] == ENTRY_NIHIL)
                     {
                         EnterEvadeMode();
-                        me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE);
+                        me->SetUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
                         IsNihil = true;
                     }
                     else
@@ -388,7 +388,7 @@ public:
                             ++NihilSpeech_Phase;
                             break;
                         case 4:
-                            me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
+                            me->SetUnitFlag(UNIT_FLAG_NOT_SELECTABLE);
                             //take off to location above
                             me->GetMotionMaster()->MovePoint(0, me->GetPositionX() + 50.0f, me->GetPositionY(), me->GetPositionZ() + 50.0f);
                             ++NihilSpeech_Phase;
@@ -462,7 +462,7 @@ public:
 
         void Reset() override { }
 
-        void EnterCombat(Unit* /*who*/) override { }
+        void JustEngagedWith(Unit* /*who*/) override { }
 
         void MoveInLineOfSight(Unit* who) override
 
@@ -772,7 +772,7 @@ public:
             _events.ScheduleEvent(EVENT_SIMON_PERIODIC_PLAYER_CHECK, 2000);
 
             if (GameObject* relic = me->FindNearestGameObject(large ? GO_APEXIS_MONUMENT : GO_APEXIS_RELIC, searchDistance))
-                relic->SetFlag(GAMEOBJECT_FLAGS, GO_FLAG_NOT_SELECTABLE);
+                relic->SetGameObjectFlag(GO_FLAG_NOT_SELECTABLE);
         }
 
         // Called when despawning the bunny. Sets all the node GOs to their default states.
@@ -782,14 +782,14 @@ public:
 
             for (uint32 clusterId = SIMON_BLUE; clusterId < SIMON_MAX_COLORS; clusterId++)
                 if (GameObject* cluster = me->FindNearestGameObject(clusterIds[clusterId], searchDistance))
-                    cluster->SetFlag(GAMEOBJECT_FLAGS, GO_FLAG_NOT_SELECTABLE);
+                    cluster->SetGameObjectFlag(GO_FLAG_NOT_SELECTABLE);
 
             for (uint32 auraId = GO_AURA_BLUE; auraId <= GO_AURA_YELLOW; auraId++)
                 if (GameObject* auraGo = me->FindNearestGameObject(auraId, searchDistance))
                     auraGo->RemoveFromWorld();
 
             if (GameObject* relic = me->FindNearestGameObject(large ? GO_APEXIS_MONUMENT : GO_APEXIS_RELIC, searchDistance))
-                relic->RemoveFlag(GAMEOBJECT_FLAGS, GO_FLAG_NOT_SELECTABLE);
+                relic->RemoveGameObjectFlag(GO_FLAG_NOT_SELECTABLE);
 
             me->DespawnOrUnsummon(1000);
         }
@@ -832,7 +832,7 @@ public:
         {
             for (uint32 clusterId = SIMON_BLUE; clusterId < SIMON_MAX_COLORS; clusterId++)
                 if (GameObject* cluster = me->FindNearestGameObject(clusterIds[clusterId], searchDistance))
-                    cluster->RemoveFlag(GAMEOBJECT_FLAGS, GO_FLAG_NOT_SELECTABLE);
+                    cluster->RemoveGameObjectFlag(GO_FLAG_NOT_SELECTABLE);
 
             if (clustersOnly)
                 return;
@@ -886,7 +886,7 @@ public:
             {
                 if (GameObject* cluster = me->FindNearestGameObject(clusterIds[clusterId], 2.0f * searchDistance))
                 {
-                    cluster->SetFlag(GAMEOBJECT_FLAGS, GO_FLAG_NOT_SELECTABLE);
+                    cluster->SetGameObjectFlag(GO_FLAG_NOT_SELECTABLE);
 
                     // break since we don't need glowing auras for large clusters
                     if (large)
@@ -1108,7 +1108,7 @@ public:
             timer = 500;
         }
 
-        void IsSummonedBy(Unit* summoner) override
+        void IsSummonedBy(WorldObject* summoner) override
         {
             if (summoner && summoner->isType(TYPEMASK_PLAYER))
                 playerGuid = summoner->GetGUID();
