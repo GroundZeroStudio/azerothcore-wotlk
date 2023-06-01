@@ -49,13 +49,15 @@ void Totem::Update(uint32 time)
 			return;
 		}
 	}
-	else
+    else
 #endif
-    Unit* owner = GetOwner();
-    if (!owner || !owner->IsAlive() || !IsAlive() || m_duration <= time)
     {
-        UnSummon();                                         // remove self
-        return;
+        Unit* owner = GetOwner();
+        if (!owner || !owner->IsAlive() || !IsAlive() || m_duration <= time)
+        {
+            UnSummon();                                         // remove self
+            return;
+        }
     }
 
     m_duration -= time;

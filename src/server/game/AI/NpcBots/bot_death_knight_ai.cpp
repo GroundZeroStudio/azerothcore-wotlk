@@ -321,8 +321,8 @@ public:
             GetInPosition(force, u);
         }
 
-        void EnterCombat(Unit* u) override { bot_ai::EnterCombat(u); }
-        void EnterEvadeMode() override { bot_ai::EnterEvadeMode(); }
+        void JustEngagedWith(Unit* u) override { bot_ai::JustEngagedWith(u); }
+        void EnterEvadeMode(EvadeReason why = EVADE_REASON_OTHER) override { bot_ai::EnterEvadeMode(why); }
         void MoveInLineOfSight(Unit* u) override { bot_ai::MoveInLineOfSight(u); }
         void JustDied(Unit* u) override { UnsummonAll(); bot_ai::JustDied(u); }
         void KilledUnit(Unit* u) override { bot_ai::KilledUnit(u); }
@@ -927,14 +927,16 @@ public:
         void ApplyClassDamageMultiplierMelee(uint32& /*damage*/, CalcDamageInfo& damageinfo) const override
         {
             uint8 lvl = me->getLevel();
-            float fdamage = float(damageinfo.damage);
             float pctbonus = 0.0f;
-
             //Blood Gorged part 1 (white attacks): 10% bonus damage for all attacks
             if ((_spec == BOT_SPEC_DK_BLOOD) && lvl >= 64 && me->HasAuraState(AURA_STATE_HEALTH_ABOVE_75_PERCENT))
                 pctbonus += 0.1f;
 
-            damageinfo.damage = uint32(fdamage * (1.0f + pctbonus));
+            for (int i = 0; i < MAX_ITEM_PROTO_DAMAGES; ++i)
+            {
+                float fdamage = float(damageinfo.damages[i].damage);
+                damageinfo.damages[i].damage = uint32(fdamage * (1.0f + pctbonus));
+            }
         }
 
         void ApplyClassSpellCritMultiplierAll(Unit const* /*victim*/, float& crit_chance, SpellInfo const* spellInfo, SpellSchoolMask /*schoolMask*/, WeaponAttackType /*attackType*/) const override
@@ -1457,7 +1459,7 @@ public:
                     baseThreat += threatEntry->flatMod;
 
                     if (baseThreat)
-                        target->getThreatMgr().addThreat(me, baseThreat * 6, SPELL_SCHOOL_MASK_NORMAL, spell);
+                        target->GetThreatMgr().AddThreat(me, baseThreat * 6, SPELL_SCHOOL_MASK_NORMAL, spell);
                 }
             }
 

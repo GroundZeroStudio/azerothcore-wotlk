@@ -1591,16 +1591,6 @@ void Unit::CalculateMeleeDamage(Unit* victim, CalcDamageInfo* damageInfo, Weapon
             continue;
         }
 
-#ifndef NPCBOT
-    if (GetTypeId() == TYPEID_UNIT && ToCreature()->IsNPCBotOrPet())
-    {
-        damageInfo->damage = damage;
-        //damage is unused. TODO: remove this redundant argument
-        ToCreature()->ApplyBotDamageMultiplierMelee(damageInfo->damage, *damageInfo);
-        damage = damageInfo->damage;
-        damage *= BotMgr::GetBotDamageModPhysical();
-    }
-#endif
         SpellSchoolMask schoolMask = SpellSchoolMask(damageInfo->damages[i].damageSchoolMask);
         bool const addPctMods = (schoolMask & SPELL_SCHOOL_MASK_NORMAL);
 
@@ -1614,6 +1604,18 @@ void Unit::CalculateMeleeDamage(Unit* victim, CalcDamageInfo* damageInfo, Weapon
 
         // Script Hook For CalculateMeleeDamage -- Allow scripts to change the Damage pre class mitigation calculations
         sScriptMgr->ModifyMeleeDamage(damageInfo->target, damageInfo->attacker, damage);
+
+#ifndef NPCBOT
+        if (GetTypeId() == TYPEID_UNIT && ToCreature()->IsNPCBotOrPet())
+        {
+            for (int i = 0; i < MAX_ITEM_PROTO_DAMAGES; ++i)
+                damageInfo->damages[i].damage = damage;
+            //damage is unused. TODO: remove this redundant argument
+            ToCreature()->ApplyBotDamageMultiplierMelee(damageInfo->damages[0].damage, *damageInfo);
+            damage = damageInfo->damages[0].damage;
+            damage *= BotMgr::GetBotDamageModPhysical();
+        }
+#endif
 
         // Calculate armor reduction
         if (IsDamageReducedByArmor((SpellSchoolMask)(damageInfo->damages[i].damageSchoolMask)))
@@ -1977,7 +1979,7 @@ void Unit::DealMeleeDamage(CalcDamageInfo* damageInfo, bool durabilityLoss)
     else if (ToCreature()->IsNPCBot())
     {
         DamageInfo dmgInfo(*damageInfo);
-        ToCreature()->CastCreatureItemCombatSpell(victim, damageInfo->attackType, damageInfo->procVictim, damageInfo->damageSchoolMask);
+        ToCreature()->CastCreatureItemCombatSpell(victim, damageInfo->attackType, damageInfo->procVictim, damageInfo->damages[0].damageSchoolMask);
     }
 #endif
 

@@ -38,9 +38,9 @@ public:
     {
         dreadlord_botpetAI(Creature* creature) : bot_pet_ai(creature) { }
 
-        void EnterCombat(Unit* u) override { bot_pet_ai::EnterCombat(u); }
+        void JustEngagedWith(Unit* u) override { bot_pet_ai::JustEngagedWith(u); }
         void KilledUnit(Unit* u) override { bot_pet_ai::KilledUnit(u); }
-        void EnterEvadeMode() override { bot_pet_ai::EnterEvadeMode(); }
+        void EnterEvadeMode(EvadeReason why = EVADE_REASON_OTHER) override { bot_pet_ai::EnterEvadeMode(why); }
         void MoveInLineOfSight(Unit* u) override { bot_pet_ai::MoveInLineOfSight(u); }
         void JustDied(Unit* u) override { bot_pet_ai::JustDied(u); }
         void DoNonCombatActions(uint32 /*diff*/) { }

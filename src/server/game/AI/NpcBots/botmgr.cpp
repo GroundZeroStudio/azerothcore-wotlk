@@ -714,7 +714,7 @@ void BotMgr::_teleportBot(Creature* bot, Map* newMap, float x, float y, float z,
         bot->CombatStop();
         bot->ClearComboPoints();
         bot->ClearComboPointHolders();
-        bot->DeleteThreatList();
+        bot->GetThreatMgr().ClearAllThreat();
         bot->getHostileRefMgr().deleteReferences();
         mymap->RemoveFromMap(bot, false);
     }

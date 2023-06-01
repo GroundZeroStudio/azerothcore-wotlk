@@ -302,10 +302,10 @@ public:
             GetInPosition(force, u);
         }
 
-        void EnterCombat(Unit* u) override { bot_ai::EnterCombat(u); }
+        void JustEngagedWith(Unit* u) override { bot_ai::JustEngagedWith(u); }
         void AttackStart(Unit*) override { }
         void KilledUnit(Unit* u) override { bot_ai::KilledUnit(u); }
-        void EnterEvadeMode() override { bot_ai::EnterEvadeMode(); }
+        void EnterEvadeMode(EvadeReason why = EVADE_REASON_OTHER) override { bot_ai::EnterEvadeMode(why); }
         void MoveInLineOfSight(Unit* u) override { bot_ai::MoveInLineOfSight(u); }
         void DoNonCombatActions(uint32 /*diff*/) { }
 
@@ -606,7 +606,7 @@ public:
             }
 
             CalcDamageInfo* dinfo = new CalcDamageInfo();
-            me->CalculateMeleeDamage(target, 0, dinfo, BASE_ATTACK);
+            me->CalculateMeleeDamage(target, dinfo, BASE_ATTACK);
 
             me->SetFloatValue(UNIT_FIELD_MINDAMAGE, mindam);
             me->SetFloatValue(UNIT_FIELD_MAXDAMAGE, maxdam);
@@ -754,7 +754,7 @@ public:
             {
                 //manually add threat as if damage was done
                 if (victim->GetTypeId() == TYPEID_UNIT)
-                    victim->getThreatMgr().addThreat(me, float(damage + damage));
+                    victim->GetThreatMgr().AddThreat(me, float(damage + damage));
 
                 damage = 0;
             }

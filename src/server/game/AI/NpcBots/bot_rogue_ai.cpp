@@ -229,9 +229,9 @@ public:
             GetInPosition(force, u);
         }
 
-        void EnterCombat(Unit* u) override { bot_ai::EnterCombat(u); }
+        void JustEngagedWith(Unit* u) override { bot_ai::JustEngagedWith(u); }
         void KilledUnit(Unit* u) override { bot_ai::KilledUnit(u); }
-        void EnterEvadeMode() override { bot_ai::EnterEvadeMode(); }
+        void EnterEvadeMode(EvadeReason why = EVADE_REASON_OTHER) override { bot_ai::EnterEvadeMode(why); }
         void MoveInLineOfSight(Unit* u) override { bot_ai::MoveInLineOfSight(u); }
         void JustDied(Unit* u) override { comboPoints = 0; bot_ai::JustDied(u); }
 
@@ -524,7 +524,7 @@ public:
             if (opponent->CanHaveThreatList())
             {
                 if (IsSpellReady(FEINT_1, diff) && !stealthed && !IsTank() && opponent->GetVictim() == me && Rand() < 35 &&
-                    energy >= ecost(FEINT_1) && int32(opponent->getThreatMgr().getOnlineContainer().getThreatList().size()) > 1 &&
+                    energy >= ecost(FEINT_1) && int32(opponent->GetThreatMgr().GetOnlineContainer().GetThreatList().size()) > 1 &&
                     int32(opponent->getAttackers().size()) > 1)
                 {
                     if (doCast(opponent, GetSpell(FEINT_1)))
@@ -949,7 +949,7 @@ public:
                 if (IsTank(player) || player->GetVictim() == victim)
                 {
                     if (!victim->CanHaveThreatList() ||
-                        victim->getThreatMgr().getThreat(player) < victim->getThreatMgr().getThreat(me) * 0.75f)
+                        victim->GetThreatMgr().GetThreat(player) < victim->GetThreatMgr().GetThreat(me) * 0.75f)
                     {
                         target = player;
                         break;

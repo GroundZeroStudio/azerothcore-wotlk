@@ -3803,7 +3803,7 @@ bool bot_ai::CheckAttackTarget()
     else if (!IsTank() && opponent != me->GetVictim() && opponent->GetVictim() && opponent->CanHaveThreatList() &&
         opponent->ToCreature()->GetCreatureTemplate()->rank == CREATURE_ELITE_WORLDBOSS && me->GetMap()->IsRaid())
     {
-        uint32 threat = uint32(opponent->ToCreature()->getThreatMgr().getThreat(opponent->GetVictim()));
+        uint32 threat = uint32(opponent->ToCreature()->GetThreatMgr().GetThreat(opponent->GetVictim()));
         if (threat < std::min<uint32>(50000, opponent->GetVictim()->GetMaxHealth() / 2))
             return false;
     }
@@ -8818,7 +8818,7 @@ bool bot_ai::_canLootCreatureForPlayer(Player* player, Creature* creature, uint3
             continue;
         }
 
-        if (_canLootItemForPlayer(player, creature, slot - 1) && i->AllowedForPlayer(player))
+        if (_canLootItemForPlayer(player, creature, slot - 1) && i->AllowedForPlayer(player, i->rollWinnerGUID))
         {
             canLoot = true;
             break;
@@ -8861,7 +8861,7 @@ bool bot_ai::_canLootCreatureForPlayer(Player* player, Creature* creature, uint3
                 continue;
             }
 
-            if (_canLootItemForPlayer(player, creature, slot - 1) && i->AllowedForPlayer(player))
+            if (_canLootItemForPlayer(player, creature, slot - 1) && i->AllowedForPlayer(player, i->rollWinnerGUID))
             {
                 canLoot = true;
                 break;
@@ -9037,11 +9037,12 @@ void bot_ai::_autoLootCreatureItems(Player* receiver, Creature* creature, uint32
         if (!((1 << itemProto->Quality) & lootQualityMask))
             continue;
 
-        if (_canLootItemForPlayer(receiver, creature, slot - 1) && i->AllowedForPlayer(receiver))
+        if (_canLootItemForPlayer(receiver, creature, slot - 1) && i->AllowedForPlayer(receiver, i->rollWinnerGUID))
         {
             //LOG_ERROR("scripts", "looting %s ({}), quality {}, threshold {}",
             //    itemProto->Name1.c_str(), itemProto->ItemId, itemProto->Quality, lootThreshold);
-            receiver->StoreLootItem(slot - 1, &creature->loot);
+            InventoryResult msg;
+            receiver->StoreLootItem(slot - 1, &creature->loot, msg);
         }
     }
     for (std::vector<LootItem>::iterator i = creature->loot.quest_items.begin(); i != creature->loot.quest_items.end(); ++i)
@@ -9067,8 +9068,9 @@ void bot_ai::_autoLootCreatureItems(Player* receiver, Creature* creature, uint32
         if (!((1 << itemProto->Quality) & lootQualityMask))
             continue;
 
-        if (_canLootItemForPlayer(receiver, creature, slot - 1) && i->AllowedForPlayer(receiver))
-            receiver->StoreLootItem(slot - 1, &creature->loot);
+        InventoryResult msg;
+        if (_canLootItemForPlayer(receiver, creature, slot - 1) && i->AllowedForPlayer(receiver, i->rollWinnerGUID))
+            receiver->StoreLootItem(slot - 1, &creature->loot, msg);
     }
     if (creature->loot.isLooted())
     {
@@ -12391,7 +12393,7 @@ bool bot_ai::StartAttack(Unit const* u, bool force)
     return true;
 }
 
-void bot_ai::EnterCombat(Unit* u)
+void bot_ai::JustEngagedWith(Unit* u)
 {
     _atHome = false;
 

@@ -247,14 +247,14 @@ public:
                 return false;
             return bot_ai::doCast(victim, spellId);
         }
-        void EnterCombat(Unit* u) override
+        void JustEngagedWith(Unit* u) override
         {
-            bot_ai::EnterCombat(u);
+            bot_ai::JustEngagedWith(u);
             me->AddAura(32737, me);
 
         }
         void KilledUnit(Unit* u) override { bot_ai::KilledUnit(u); }
-        void EnterEvadeMode() override { bot_ai::EnterEvadeMode(); }
+        void EnterEvadeMode(EvadeReason why = EVADE_REASON_OTHER) override { bot_ai::EnterEvadeMode(why); }
         void MoveInLineOfSight(Unit* u) override { bot_ai::MoveInLineOfSight(u); }
         void JustDied(Unit* u) override { removeShapeshiftForm(); UnsummonAll(); bot_ai::JustDied(u); }
 
@@ -972,7 +972,7 @@ public:
             if (opponent->CanHaveThreatList())
             {
                 if (IsSpellReady(COWER_1, diff) && opponent->GetVictim() == me && energy >= acost(COWER_1) &&
-                    int32(opponent->getThreatMgr().getOnlineContainer().getThreatList().size()) > 1 &&
+                    int32(opponent->GetThreatMgr().GetOnlineContainer().GetThreatList().size()) > 1 &&
                     int32(opponent->getAttackers().size()) > 1 && Rand() < 45)
                 {
                     if (doCast(opponent, GetSpell(COWER_1)))
@@ -1708,7 +1708,8 @@ public:
                     pctbonus += 0.05f;
             }
 
-            damageinfo.damage *= (1.0f + pctbonus);
+            for (int i = 0; i < MAX_ITEM_PROTO_DAMAGES; ++i)
+                damageinfo.damages[i].damage *= (1.0f + pctbonus);
         }
 
         void ApplyClassDamageMultiplierMeleeSpell(int32& damage, SpellNonMeleeDamage& damageinfo, SpellInfo const* spellInfo, WeaponAttackType /*attackType*/, bool crit) const override

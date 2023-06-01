@@ -241,7 +241,7 @@ public:
             GetInPosition(force, u);
         }
 
-        void EnterCombat(Unit* u) override { bot_ai::EnterCombat(u); }
+        void JustEngagedWith(Unit* u) override { bot_ai::JustEngagedWith(u); }
         void KilledUnit(Unit* u) override
         {
             //Victorious State spell
@@ -251,7 +251,7 @@ public:
 
             bot_ai::KilledUnit(u);
         }
-        void EnterEvadeMode() override { bot_ai::EnterEvadeMode(); }
+        void EnterEvadeMode(EvadeReason why = EVADE_REASON_OTHER) override { bot_ai::EnterEvadeMode(why); }
         void MoveInLineOfSight(Unit* u) override { bot_ai::MoveInLineOfSight(u); }
         void JustDied(Unit* u) override { bot_ai::JustDied(u); }
         void DoNonCombatActions(uint32 /*diff*/) { }
@@ -1267,7 +1267,8 @@ public:
                                 pctbonus *= 1.025f;
             }
 
-            damageinfo.damage *= pctbonus;
+            for (int i = 0; i < MAX_ITEM_PROTO_DAMAGES; ++i)
+                damageinfo.damages[i].damage *= pctbonus;
         }
 
         void ApplyClassSpellCritMultiplierAll(Unit const* /*victim*/, float& crit_chance, SpellInfo const* spellInfo, SpellSchoolMask /*schoolMask*/, WeaponAttackType attackType) const override

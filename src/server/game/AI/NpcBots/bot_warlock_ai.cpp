@@ -230,9 +230,9 @@ public:
             return bot_ai::doCast(victim, spellId);
         }
 
-        void EnterCombat(Unit* u) override { canShadowWard = false; bot_ai::EnterCombat(u); }
+        void JustEngagedWith(Unit* u) override { canShadowWard = false; bot_ai::JustEngagedWith(u); }
         void KilledUnit(Unit* u) override { bot_ai::KilledUnit(u); }
-        void EnterEvadeMode() override { bot_ai::EnterEvadeMode(); }
+        void EnterEvadeMode(EvadeReason why = EVADE_REASON_OTHER) override { bot_ai::EnterEvadeMode(why); }
         void MoveInLineOfSight(Unit* u) override { bot_ai::MoveInLineOfSight(u); }
         void JustDied(Unit* u) override { UnsummonAll(); bot_ai::JustDied(u); }
         void DoNonCombatActions(uint32 diff)
@@ -464,7 +464,7 @@ public:
                 return;
 
             Unit* u = *(me->getAttackers().begin());
-            if (u->getThreatMgr().getOnlineContainer().getThreatList().size() < 3 || u->getThreatMgr().getThreat(me) < 100.f)
+            if (u->GetThreatMgr().GetOnlineContainer().GetThreatList().size() < 3 || u->GetThreatMgr().GetThreat(me) < 100.f)
                 return;
 
             if (doCast(me, GetSpell(SOULSHATTER_1)))

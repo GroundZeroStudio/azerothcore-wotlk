@@ -148,9 +148,9 @@ public:
             GetInPosition(force, u);
         }
 
-        void EnterCombat(Unit* u) override { bot_ai::EnterCombat(u); }
+        void JustEngagedWith(Unit* u) override { bot_ai::JustEngagedWith(u); }
         void KilledUnit(Unit* u) override { bot_ai::KilledUnit(u); }
-        void EnterEvadeMode() override { bot_ai::EnterEvadeMode(); }
+        void EnterEvadeMode(EvadeReason why = EVADE_REASON_OTHER) override { bot_ai::EnterEvadeMode(why); }
         void MoveInLineOfSight(Unit* u) override { bot_ai::MoveInLineOfSight(u); }
         void JustDied(Unit* u) override { UnsummonAll(); bot_ai::JustDied(u); }
         void DoNonCombatActions(uint32 /*diff*/) { }
@@ -283,7 +283,8 @@ public:
             if (CCed(damageinfo.target))
                 pctbonus *= 1.5f;
 
-            damageinfo.damage *= pctbonus;
+            for (int i = 0; i < MAX_ITEM_PROTO_DAMAGES; ++i)
+                damageinfo.damages[i].damage *= pctbonus;
         }
 
         void ApplyClassDamageMultiplierSpell(int32& damage, SpellNonMeleeDamage& damageinfo, SpellInfo const* spellInfo, WeaponAttackType /*attackType*/, bool crit) const override
