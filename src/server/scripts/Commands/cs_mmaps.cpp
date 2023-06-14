@@ -61,6 +61,20 @@ public:
         return commandTable;
     }
 
+    static bool string_start_with(std::string& str, const char* compare)
+    {
+        int compare_len = strlen(compare);
+        if (str.length() != compare_len)
+            return false;
+        const char * str_chars = str.c_str();
+        for (int i = 0; i < compare_len; ++i)
+        {
+            if (str_chars[i] != compare[i])
+                return false;
+        }
+        return true;
+    }
+
     static bool HandleMmapPathCommand(ChatHandler* handler, Optional<std::string> param)
     {
         if (!MMAP::MMapFactory::createOrGetMMapMgr()->GetNavMesh(handler->GetSession()->GetPlayer()->GetMapId()))
@@ -85,12 +99,12 @@ public:
         if (param)
         {
             auto paramValue = param.value();
-            if (paramValue.starts_with("true"))
+            if (string_start_with(paramValue, "true"))
             {
                 useStraightPath = true;
             }
 
-            if (paramValue.starts_with("line") || paramValue.starts_with("ray") || paramValue.starts_with("raycast"))
+            if (string_start_with(paramValue, "line") || string_start_with(paramValue, "ray") || string_start_with(paramValue ,"raycast"))
             {
                 useRaycast = true;
             }

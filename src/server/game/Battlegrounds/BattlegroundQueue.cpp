@@ -103,7 +103,14 @@ bool BattlegroundQueue::SelectionPool::KickGroup(const uint32 size)
     // remove selected from pool
     auto playersCountInGroup{ groupToKick->Players.size() };
     PlayerCount -= playersCountInGroup;
-    std::erase(SelectedGroups, groupToKick);
+    for (GroupsQueueType::iterator itr = SelectedGroups.begin(); itr != SelectedGroups.end(); ++itr)
+    {
+        if ((*itr) == groupToKick)
+        {
+            SelectedGroups.erase(itr);
+            break;
+        }
+    }
 
     if (foundProper)
         return false;
