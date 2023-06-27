@@ -426,6 +426,8 @@ void Player::Update(uint32 p_time)
         RemoveFromNotify(NOTIFY_VISIBILITY_CHANGED);
     }
 
+    sScriptMgr->OnAfterPlayerUpdate(this, p_time);
+
 #ifndef NPCBOT
     if (_botMgr)
         _botMgr->Update(p_time);
