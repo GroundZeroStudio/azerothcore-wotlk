@@ -43,8 +43,8 @@ void WorldSession::HandleJoinChannel(WorldPacket& recvPacket)
     if (channelName.empty())
         return;
 
-    if (isdigit(channelName[0]))
-        return;
+    //if (isdigit(channelName[0]))
+    //    return;
 
     if (channelName.size() >= 100 || !DisallowHyperlinksAndMaybeKick(channelName))
     {
