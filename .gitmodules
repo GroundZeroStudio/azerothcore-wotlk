@@ -3,4 +3,13 @@
 	url = https://github.com/ingydotnet/git-subrepo.git
 [submodule "modules/mod-playerbots"]
 	path = modules/mod-playerbots
-	url = https://github.com/ZhengPeiRu21/mod-playerbots.git
+	url = https://github.com/GroundZeroStudio/mod-playerbots.git
+[submodule "modules/mod-ah-bot"]
+	path = modules/mod-ah-bot
+	url = https://github.com/azerothcore/mod-ah-bot.git
+[submodule "modules/mod-eluna-lua-engine"]
+	path = modules/mod-eluna-lua-engine
+	url = https://github.com/azerothcore/mod-eluna-lua-engine.git
+[submodule "modules/mod-transmog"]
+	path = modules/mod-transmog
+	url = https://github.com/azerothcore/mod-transmog.git
